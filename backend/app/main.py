@@ -1,0 +1,62 @@
+"""
+backend/app/main.py — FastAPI Application Entry Point
+
+This is the root of the FastAPI application.
+
+FastAPI auto-generates interactive API documentation at:
+  http://localhost:8000/docs    ← Swagger UI (try requests in browser)
+  http://localhost:8000/redoc  ← ReDoc (cleaner docs)
+
+When running:
+  uvicorn backend.app.main:app --reload --port 8000
+"""
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
+from backend.app.core.config import settings
+from backend.app.api.routes import jds, candidates, matching, health
+
+# Create the FastAPI application
+app = FastAPI(
+    title="Diversifying.io AI Recruitment API",
+    description=(
+        "AI-powered candidate matching for recruiters. "
+        "Upload JDs and CVs, get semantic match scores and explainable recommendations."
+    ),
+    version="0.1.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+)
+
+# ---- CORS Middleware ----
+# CORS (Cross-Origin Resource Sharing) allows the frontend (running on
+# a different port) to call this API.
+# In production, replace "*" with the actual frontend domain.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"] if settings.ENVIRONMENT == "development" else ["https://yourdomain.com"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ---- Register Routers ----
+# Each router handles a group of related endpoints.
+# The prefix becomes part of the URL: /api/v1/jds, /api/v1/candidates, etc.
+app.include_router(health.router, prefix="/api/v1", tags=["health"])
+app.include_router(jds.router, prefix="/api/v1/jds", tags=["Job Descriptions"])
+app.include_router(candidates.router, prefix="/api/v1/candidates", tags=["Candidates"])
+app.include_router(matching.router, prefix="/api/v1/matching", tags=["Matching"])
+
+
+@app.get("/", response_class=JSONResponse, tags=["root"])
+async def root():
+    """Root endpoint — useful for checking the API is running."""
+    return {
+        "message": "Diversifying.io AI Recruitment API",
+        "version": "0.1.0",
+        "docs": "/docs",
+        "environment": settings.ENVIRONMENT,
+    }

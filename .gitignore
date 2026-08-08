@@ -1,0 +1,62 @@
+# ============================================================
+# .gitignore — Diversifying.io Recruitment Tool
+# Files and directories NOT to commit to version control
+# ============================================================
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# ---- Virtual Environments ----
+venv/
+.venv/
+env/
+.env_local/
+
+# ---- Environment & Secrets ----
+.env
+# NEVER commit these:
+data/processed/cvs_raw.json
+data/processed/pii_mapping.json
+
+# ---- Data files (raw CVs are personal data) ----
+data/raw/cvs/
+# JDs are public job postings, so they can be committed if desired
+# data/raw/jds/
+
+# ---- Generated outputs (can be regenerated) ----
+data/processed/*.json
+# Uncomment to also ignore docs outputs:
+# docs/evaluation_results.xlsx
+
+# ---- IDE ----
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ---- Database ----
+*.sqlite3
+*.db
+
+# ---- Logs ----
+*.log
+logs/
+
+# ---- Docker ----
+# (docker volumes are managed by Docker, not Git)
+
+# ---- Node (frontend) ----
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.env.local

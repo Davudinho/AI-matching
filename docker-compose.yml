@@ -1,0 +1,58 @@
+# ============================================================
+# docker-compose.yml — Diversifying.io Recruitment Tool
+#
+# This file defines the services that run in Docker containers.
+# Think of each "service" as an isolated computer with its own
+# software, networking, and storage.
+#
+# HOW TO START:
+#   docker compose up -d
+#
+# HOW TO STOP:
+#   docker compose down
+#
+# HOW TO VIEW LOGS:
+#   docker compose logs -f postgres
+# ============================================================
+
+services:
+
+  # ---- PostgreSQL with pgvector ----
+  # pgvector extends PostgreSQL with vector similarity search —
+  # this is what lets us store and query AI embeddings (768-dim floats).
+  postgres:
+    image: pgvector/pgvector:pg16        # Official pgvector image, PostgreSQL 16
+    container_name: dyversifying_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: dyversifying_db
+      POSTGRES_USER: dyversifying_user
+      POSTGRES_PASSWORD: change_me_in_production  # ← Change this in production!
+    ports:
+      - "5432:5432"                      # host:container — access via localhost:5432
+    volumes:
+      - postgres_data:/var/lib/postgresql/data   # Named volume: data persists after restart
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/schema.sql  # Auto-runs on first start
+
+  # ---- PgAdmin (optional, useful for exploring the DB in a browser) ----
+  # Access at http://localhost:5050
+  # Login: admin@dyversifying.io / admin_password
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: dyversifying_pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@dyversifying.io
+      PGADMIN_DEFAULT_PASSWORD: admin_password
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    profiles:
+      - dev                              # Only starts with: docker compose --profile dev up
+
+# ---- Named Volumes ----
+# Docker named volumes persist data even when containers are stopped or removed.
+volumes:
+  postgres_data:
+    driver: local
