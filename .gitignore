@@ -36,6 +36,11 @@ data/processed/*.json
 # Uncomment to also ignore docs outputs:
 # docs/evaluation_results.xlsx
 
+# ---- Office temp files (created when Excel/Word has a file open) ----
+~$*.xlsx
+~$*.docx
+~$*.doc
+
 # ---- IDE ----
 .vscode/
 .idea/

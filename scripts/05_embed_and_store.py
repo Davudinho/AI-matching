@@ -5,13 +5,13 @@ PURPOSE:
     Reads all JDs and CVs from PostgreSQL, generates Gemini embedding vectors
     for each one, and stores the vectors back in the database.
 
-    After this script, every JD and CV has a 768-dimensional vector stored in
+    After this script, every JD and CV has a 3072-dimensional vector stored in
     jd_embeddings and cv_embeddings tables. These vectors are used in
     06_match_evaluate.py to find semantically similar JD-CV pairs.
 
 WHAT IS AN EMBEDDING?
     An embedding is a mathematical representation of text meaning.
-    Imagine each document as a point in 768-dimensional space.
+    Imagine each document as a point in 3072-dimensional space.
     Documents with similar meaning are close together; different ones are far apart.
     
     Example:

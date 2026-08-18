@@ -28,9 +28,9 @@ class Settings(BaseSettings):
 
     # ---- Gemini AI ----
     GEMINI_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-2.0-flash"
-    GEMINI_EMBEDDING_MODEL: str = "models/embedding-001"
-    EMBEDDING_DIMENSION: int = 768
+    GEMINI_MODEL: str = "gemini-3.6-flash"
+    GEMINI_EMBEDDING_MODEL: str = "gemini-embedding-001"
+    EMBEDDING_DIMENSION: int = 3072
 
     # ---- Auth ----
     SECRET_KEY: str = "dev_secret_key_change_in_production"

@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS job_descriptions (
     skills_soft             JSONB DEFAULT '[]',   -- Soft skills: leadership, communication
     qualifications          JSONB DEFAULT '[]',   -- Degrees, professional certifications
     
-    raw_text            TEXT,                     -- Full original document text
+    raw_text            TEXT,                     -- Full original doc16ument text
     embedding_text      TEXT,                     -- Focused text used to create embeddings
     
     -- Data quality
@@ -101,22 +101,23 @@ CREATE INDEX IF NOT EXISTS idx_candidate_title ON candidates (current_title);
 -- ============================================================
 -- TABLE: jd_embeddings
 -- Stores the AI embedding vector for each JD.
--- vector(768) = a list of 768 floating-point numbers representing
+-- vector(3072) = a list of 3072 floating-point numbers representing
 -- the semantic "meaning" of the JD in mathematical space.
+-- (gemini-embedding-001 produces 3072-dimensional vectors)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS jd_embeddings (
     jd_id       UUID NOT NULL REFERENCES job_descriptions(jd_id) ON DELETE CASCADE,
-    model       TEXT NOT NULL DEFAULT 'models/embedding-001',
-    embedding   vector(768),
+    model       TEXT NOT NULL DEFAULT 'gemini-embedding-001',
+    embedding   vector(3072),
     created_at  TIMESTAMPTZ DEFAULT NOW(),
     PRIMARY KEY (jd_id, model)
 );
 
--- IVFFlat index: makes vector similarity search fast.
--- "lists=100" means vectors are grouped into 100 clusters for faster search.
--- This is similar to how an index in a book helps you find pages quickly.
+-- HNSW index: makes vector similarity search fast.
+-- IVFFlat is limited to 2000 dimensions; HNSW supports up to 16,000.
+-- gemini-embedding-001 produces 3072 dimensions, so HNSW is required.
 CREATE INDEX IF NOT EXISTS idx_jd_embedding_vector
-    ON jd_embeddings USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+    ON jd_embeddings USING hnsw (embedding vector_cosine_ops);
 
 
 -- ============================================================
@@ -125,14 +126,14 @@ CREATE INDEX IF NOT EXISTS idx_jd_embedding_vector
 -- ============================================================
 CREATE TABLE IF NOT EXISTS cv_embeddings (
     cv_id       UUID NOT NULL REFERENCES candidates(cv_id) ON DELETE CASCADE,
-    model       TEXT NOT NULL DEFAULT 'models/embedding-001',
-    embedding   vector(768),
+    model       TEXT NOT NULL DEFAULT 'gemini-embedding-001',
+    embedding   vector(3072),
     created_at  TIMESTAMPTZ DEFAULT NOW(),
     PRIMARY KEY (cv_id, model)
 );
 
 CREATE INDEX IF NOT EXISTS idx_cv_embedding_vector
-    ON cv_embeddings USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+    ON cv_embeddings USING hnsw (embedding vector_cosine_ops);
 
 
 -- ============================================================

@@ -8,7 +8,7 @@ and provides two main capabilities:
 1. generate_json()  — Send text to Gemini Flash and get structured JSON back.
    Used for: extracting fields from JDs/CVs, generating explanations.
 
-2. embed_texts()    — Convert text into a 768-dimensional vector (embedding).
+2. embed_texts()    — Convert text into a 3072-dimensional vector (embedding).
    Used for: semantic similarity search between JDs and CVs.
 
 Why a service class?
@@ -31,7 +31,10 @@ from tenacity import (
     retry_if_exception_type,
 )
 
-from app.core.config import settings
+try:
+    from app.core.config import settings  # when running inside backend/
+except ModuleNotFoundError:
+    from backend.app.core.config import settings  # when running from project root
 
 logger = logging.getLogger(__name__)
 
@@ -162,7 +165,7 @@ class GeminiService:
 
     def embed_text(self, text: str, task_type: str = "RETRIEVAL_DOCUMENT") -> list:
         """
-        Convert a single text into a 768-dimensional embedding vector.
+        Convert a single text into a 3072-dimensional embedding vector.
 
         Args:
             text: The text to embed (JD or CV content)
@@ -171,7 +174,7 @@ class GeminiService:
                 - "RETRIEVAL_QUERY" for search queries
 
         Returns:
-            List of 768 floats, or empty list on failure.
+            List of 3072 floats, or empty list on failure.
 
         What is an embedding vector?
         Think of it as GPS coordinates for meaning. Similar texts have
