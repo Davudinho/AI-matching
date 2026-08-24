@@ -275,6 +275,11 @@ def anonymise_cv(cv: dict, anon_ref: str) -> tuple[dict, dict]:
         "right_to_work_uk": cv.get("right_to_work_uk"),
         "sector_experience": cv.get("sector_experience", []),
 
+        # Week 4: Profession domain fields (no PII — safe to pass through)
+        "profession_domain": cv.get("profession_domain"),
+        "career_summary": cv.get("career_summary"),
+
+
         # Anonymised full text
         "raw_text_anon": _anonymise_raw_text(
             cv.get("raw_text", ""),

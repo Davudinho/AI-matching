@@ -139,6 +139,10 @@ Extract:
   "linkedin_url": "LinkedIn profile URL if mentioned, else null",
   "current_title": "most recent job title",
   "years_experience": <estimated total years of professional experience as integer, or null>,
+
+  "profession_domain": "MUST be exactly one of: Finance | Legal | Procurement | Risk & Audit | Creative & Media | Technology | Healthcare | HR & People | General Management | Other. Choose the PRIMARY professional domain this candidate works in, based on their ENTIRE career history (not just the most recent role). A Graphic Designer who briefly worked in finance is still Creative & Media.",
+  "career_summary": "2-sentence professional summary: (1) what they do and at what level, (2) their strongest domain expertise and sector. E.g.: 'Senior Finance Manager with 9 years in NHS budget planning and financial reporting. Specialist in stakeholder engagement, variance analysis, and cross-departmental finance business partnering.'",
+
   "skills_technical": ["Python", "SQL", "Salesforce", "etc."],
   "skills_soft": ["communication", "leadership", "etc."],
   "education": [
@@ -204,11 +208,20 @@ def extract_cv_fields(raw_text: str, filename: str) -> dict:
 def _build_cv_embedding_text(fields: dict) -> str:
     """
     Build a focused text representation of a CV for embedding.
-    
-    We use anonymised-friendly text here — NO name or contact info.
-    Just professional content: title, skills, experience, education.
+
+    WEEK 4 UPDATE: profession_domain and career_summary are placed at the
+    TOP of the embedding text. This creates a strong domain-specific signal
+    so that a Creative & Media CV is semantically distant from a Finance JD.
+
+    We use anonymised-friendly text — NO name or contact info.
     """
     parts = []
+
+    # Domain fields FIRST — anchor the semantic space
+    if fields.get("profession_domain"):
+        parts.append(f"Professional Domain: {fields['profession_domain']}")
+    if fields.get("career_summary"):
+        parts.append(f"Professional Summary: {fields['career_summary']}")
 
     if fields.get("current_title"):
         parts.append(f"Job Title: {fields['current_title']}")
@@ -229,7 +242,6 @@ def _build_cv_embedding_text(fields: dict) -> str:
     if fields.get("work_history"):
         history = fields["work_history"]
         if isinstance(history, list):
-            # Include descriptions from the 3 most recent roles
             history_texts = []
             for role in history[:3]:
                 if isinstance(role, dict):
@@ -254,6 +266,7 @@ def _build_cv_embedding_text(fields: dict) -> str:
             parts.append(f"Certifications: {', '.join(certs[:5])}")
 
     return "\n".join(parts)
+
 
 
 # ============================================================

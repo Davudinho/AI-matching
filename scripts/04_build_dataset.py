@@ -169,15 +169,21 @@ def insert_jds(conn, jds: list[dict]) -> list[dict]:
                     salary_range, contract_type, seniority_level, sector,
                     responsibilities, essential_requirements, desirable_requirements,
                     skills_technical, skills_soft, qualifications,
+                    profession_domain, profession_keywords, min_years_experience,
                     raw_text, embedding_text, missing_fields, quality_flags
                 ) VALUES (
                     %s, %s, %s, %s, %s,
                     %s, %s, %s, %s,
                     %s, %s, %s,
                     %s, %s, %s,
+                    %s, %s, %s,
                     %s, %s, %s, %s
                 )
-                ON CONFLICT (jd_id) DO NOTHING
+                ON CONFLICT (jd_id) DO UPDATE SET
+                    profession_domain    = EXCLUDED.profession_domain,
+                    profession_keywords  = EXCLUDED.profession_keywords,
+                    min_years_experience = EXCLUDED.min_years_experience,
+                    embedding_text       = EXCLUDED.embedding_text
             """, (
                 jd["jd_id"],
                 jd.get("filename"),
@@ -188,13 +194,16 @@ def insert_jds(conn, jds: list[dict]) -> list[dict]:
                 jd.get("contract_type"),
                 jd.get("seniority_level"),
                 jd.get("sector"),
-                # JSONB fields: pass as JSON strings
                 json.dumps(jd.get("responsibilities") or []),
                 json.dumps(jd.get("essential_requirements") or []),
                 json.dumps(jd.get("desirable_requirements") or []),
                 json.dumps(jd.get("skills_technical") or []),
                 json.dumps(jd.get("skills_soft") or []),
                 json.dumps(jd.get("qualifications") or []),
+                # New Week 4 fields
+                jd.get("profession_domain"),
+                json.dumps(jd.get("profession_keywords") or []),
+                jd.get("min_years_experience"),
                 jd.get("raw_text"),
                 jd.get("embedding_text"),
                 json.dumps(jd.get("missing_fields") or []),
@@ -237,14 +246,19 @@ def insert_candidates(conn, cvs: list[dict]) -> list[dict]:
                     cv_id, filename, anon_ref, current_title, years_experience,
                     skills_technical, skills_soft, education, work_history,
                     certifications, languages, right_to_work_uk, sector_experience,
+                    profession_domain, career_summary,
                     raw_text_anon, embedding_text, missing_fields
                 ) VALUES (
                     %s, %s, %s, %s, %s,
                     %s, %s, %s, %s,
                     %s, %s, %s, %s,
+                    %s, %s,
                     %s, %s, %s
                 )
-                ON CONFLICT (cv_id) DO NOTHING
+                ON CONFLICT (cv_id) DO UPDATE SET
+                    profession_domain = EXCLUDED.profession_domain,
+                    career_summary    = EXCLUDED.career_summary,
+                    embedding_text    = EXCLUDED.embedding_text
             """, (
                 cv["cv_id"],
                 cv.get("filename"),
@@ -259,6 +273,9 @@ def insert_candidates(conn, cvs: list[dict]) -> list[dict]:
                 json.dumps(cv.get("languages") or []),
                 cv.get("right_to_work_uk"),
                 json.dumps(cv.get("sector_experience") or []),
+                # New Week 4 fields
+                cv.get("profession_domain"),
+                cv.get("career_summary"),
                 cv.get("raw_text_anon"),
                 cv.get("embedding_text"),
                 json.dumps(cv.get("missing_fields") or []),

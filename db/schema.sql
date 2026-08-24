@@ -39,8 +39,14 @@ CREATE TABLE IF NOT EXISTS job_descriptions (
     skills_technical        JSONB DEFAULT '[]',   -- Hard skills: Python, Salesforce, etc.
     skills_soft             JSONB DEFAULT '[]',   -- Soft skills: leadership, communication
     qualifications          JSONB DEFAULT '[]',   -- Degrees, professional certifications
-    
-    raw_text            TEXT,                     -- Full original doc16ument text
+    -- Week 4: Profession domain for matching gate
+    -- Must be one of the PROFESSION_DOMAINS list defined in 01_parse_jds.py
+    profession_domain    TEXT,
+    profession_keywords  JSONB DEFAULT '[]'::jsonb,
+    min_years_experience INT,         -- Minimum years required (inferred from seniority)
+
+    -- AI & quality metadata
+    raw_text             TEXT,         -- Original text extracted from the .docx filent text
     embedding_text      TEXT,                     -- Focused text used to create embeddings
     
     -- Data quality
@@ -83,9 +89,12 @@ CREATE TABLE IF NOT EXISTS candidates (
     languages           JSONB DEFAULT '[]',   -- ["English", "French"]
     sector_experience   JSONB DEFAULT '[]',   -- ["Charity", "Tech"]
     
-    right_to_work_uk    BOOLEAN,             -- NULL if not mentioned in CV
-    
-    raw_text_anon       TEXT,               -- Full anonymised CV text (no PII)
+    right_to_work_uk    BOOLEAN,             -- Week 4: Profession domain for matching gate
+    profession_domain TEXT,     -- e.g. "Creative & Media", "Finance"
+    career_summary    TEXT,     -- 2-sentence AI-generated professional summary
+
+    -- Text used for embedding generation (anonymised, focused on professional content)
+    raw_text_anon    TEXT,               -- Full anonymised CV text (no PII)
     embedding_text      TEXT,               -- Focused text for embeddings
     
     missing_fields      JSONB DEFAULT '[]',
@@ -150,15 +159,21 @@ CREATE TABLE IF NOT EXISTS match_results (
     semantic_score  FLOAT,      -- Cosine similarity: 0.0 (no match) to 1.0 (identical)
     skill_overlap   FLOAT,      -- Jaccard similarity of skill lists: |A∩B| / |A∪B|
     rank_position   INT,        -- 1 = best match for this JD
-    
+
+    -- Week 4: Composite scoring
+    composite_score FLOAT,      -- Weighted: 0.6×semantic + 0.3×skill_overlap + 0.1×experience_fit
+    experience_fit  FLOAT,      -- 0.0–1.0: how well CV years_experience matches JD seniority
+    filter_passed   BOOLEAN DEFAULT TRUE,  -- FALSE if candidate failed a hard filter
+    experiment_id   TEXT DEFAULT 'week4_composite',  -- Track which experiment produced this result
+
     -- AI-generated explanation ("Why is this a good match?")
     ai_explanation  TEXT,
-    
+
     -- Manually filled by the recruiter (you!) for evaluation
     -- 0 = No match, 1 = Maybe, 2 = Yes (good match)
     recruiter_label INT CHECK (recruiter_label IN (0, 1, 2)),
     recruiter_notes TEXT,
-    
+
     created_at      TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE (jd_id, cv_id)       -- Only one match result per JD-CV pair
 );

@@ -117,6 +117,22 @@ def extract_text_from_docx(filepath: Path) -> str:
 # what format to use, and how to handle missing data.
 # A well-designed prompt is the key to getting reliable, structured output.
 
+# Allowed profession domains — MUST use exactly one of these values.
+# This standardised vocabulary enables the domain-gate in matching:
+# a Creative candidate will never be shown for a Finance role.
+PROFESSION_DOMAINS = [
+    "Finance",
+    "Legal",
+    "Procurement",
+    "Risk & Audit",
+    "Creative & Media",
+    "Technology",
+    "Healthcare",
+    "HR & People",
+    "General Management",
+    "Other",
+]
+
 SYSTEM_INSTRUCTION = """You are an expert HR analyst specialising in job description analysis.
 Your task is to extract structured information from job descriptions.
 Always return valid JSON. If a field is not mentioned in the JD, use null for strings
@@ -140,6 +156,11 @@ Extract these fields:
   "contract_type": "one of: Permanent, Interim, Fixed-term, Freelance, Volunteer, null",
   "seniority_level": "one of: Junior, Mid-level, Senior, Lead, Head, Director, Executive, null",
   "sector": "primary sector: Charity, Finance, Digital, Health, Legal, Education, Government, Tech, Other",
+
+  "profession_domain": "MUST be exactly one of: Finance | Legal | Procurement | Risk & Audit | Creative & Media | Technology | Healthcare | HR & People | General Management | Other. Choose the PRIMARY professional domain this role belongs to. Examples: Senior Finance Officer → Finance. General Counsel → Legal. Delivery Manager (Online Products) → Technology. Creative Producer → Creative & Media. Head of Risk and Internal Audit → Risk & Audit. Procurement Manager → Procurement.",
+  "profession_keywords": ["3-5 domain-specific keywords that define what expertise is needed, e.g. for Finance: ['financial reporting', 'budget management', 'P&L responsibility']"],
+  "min_years_experience": "<integer: minimum years of professional experience required. Infer from seniority language: 'Junior/Graduate'=1, 'Officer/Manager'=4, 'Senior'=6, 'Head of/Director'=9. Return as integer, not string.>",
+
   "responsibilities": ["list", "of", "key", "responsibilities"],
   "essential_requirements": ["must-have", "criteria", "from", "the", "JD"],
   "desirable_requirements": ["nice-to-have", "criteria"],
@@ -199,15 +220,25 @@ def extract_jd_fields(raw_text: str, filename: str) -> dict:
 def _build_jd_embedding_text(fields: dict) -> str:
     """
     Build a focused text representation of a JD for embedding.
-    
+
+    WEEK 4 UPDATE: profession_domain and profession_keywords are now
+    placed at the TOP of the embedding text. This makes the embedding
+    more domain-specific — a Finance JD embedding will be semantically
+    farther from a Creative CV embedding than it was before.
+
     Why not embed the entire raw text?
-    - Raw text contains boilerplate (application instructions, footer, etc.)
+    - Raw text contains boilerplate (application instructions, etc.)
     - A focused representation makes similarity search more accurate
-    - Shorter text = cheaper API calls
-    
-    The embedding text combines the most semantically important fields.
     """
     parts = []
+
+    # Domain fields FIRST — they anchor the semantic space of this JD
+    if fields.get("profession_domain"):
+        parts.append(f"Professional Domain: {fields['profession_domain']}")
+    if fields.get("profession_keywords"):
+        kws = fields["profession_keywords"]
+        if isinstance(kws, list):
+            parts.append(f"Domain Keywords: {', '.join(kws[:5])}")
 
     if fields.get("title"):
         parts.append(f"Job Title: {fields['title']}")
