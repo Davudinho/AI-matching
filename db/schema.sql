@@ -183,6 +183,50 @@ CREATE INDEX IF NOT EXISTS idx_match_cv ON match_results (cv_id);
 
 
 -- ============================================================
+-- TABLE: ai_match_results  (Week 4/5)
+-- Results of the 3-stage AI-powered matching pipeline.
+-- Replaces the embedding-only match_results for production use.
+--
+-- STAGE 1: Role Gate    — Does the candidate's profession fit the JD?
+-- STAGE 2: Requirements — How well does the candidate meet each requirement?
+-- STAGE 3: Deep Analysis — Full evidence-based match report (top candidates only)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS ai_match_results (
+    id              SERIAL PRIMARY KEY,
+    jd_id           UUID NOT NULL REFERENCES job_descriptions(jd_id) ON DELETE CASCADE,
+    cv_id           UUID NOT NULL REFERENCES candidates(cv_id) ON DELETE CASCADE,
+
+    -- Stage 1: Role Gate (cheap, fast, binary)
+    stage1_passed   BOOLEAN,       -- TRUE if candidate's profession fits the JD
+    stage1_score    FLOAT,         -- 0-10: How relevant is the profession?
+    stage1_reason   TEXT,          -- 1-sentence reason from Gemini
+
+    -- Stage 2: Requirements Scoring (medium cost, per-requirement detail)
+    stage2_score         FLOAT,    -- 0-10: Overall requirements score
+    stage2_met_count     INT,      -- Number of requirements with score >= 7
+    stage2_total_count   INT,      -- Total number of requirements evaluated
+    stage2_breakdown     JSONB DEFAULT '[]'::jsonb,  -- Per-requirement scores + evidence
+    stage2_critical_gaps JSONB DEFAULT '[]'::jsonb,  -- Missing key qualifications
+
+    -- Stage 3: Deep Analysis (expensive, only top candidates)
+    stage3_explanation  TEXT,      -- Full match report
+    stage3_verdict      TEXT,      -- "Strong Match" | "Possible Match" | "Weak Match"
+
+    -- Final ranking
+    final_score     FLOAT,         -- Weighted: 35% Stage1 + 65% Stage2 (+ Stage3 if run)
+    final_rank      INT,           -- Rank among all candidates for this JD
+
+    created_at      TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(jd_id, cv_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_match_jd ON ai_match_results (jd_id);
+CREATE INDEX IF NOT EXISTS idx_ai_match_cv ON ai_match_results (cv_id);
+CREATE INDEX IF NOT EXISTS idx_ai_match_score ON ai_match_results (final_score DESC);
+
+
+
+-- ============================================================
 -- TABLE: users
 -- Recruiter accounts. Used by FastAPI JWT authentication.
 -- ============================================================
