@@ -154,6 +154,19 @@ class GeminiService:
             logger.error(f"JSON parse error from Gemini response: {e}")
             raw_snippet = raw_text[:300] if "raw_text" in dir() else "N/A"
             logger.error(f"Raw response snippet: {raw_snippet}")
+
+            # Fallback: try json-repair to fix truncated/malformed JSON
+            try:
+                from json_repair import repair_json
+                repaired = repair_json(raw_text, return_objects=True)
+                if isinstance(repaired, dict) and repaired:
+                    logger.warning("JSON repaired successfully via json-repair — using repaired result")
+                    return repaired
+            except ImportError:
+                pass  # json-repair not installed
+            except Exception:
+                pass  # repair also failed
+
             return None
         except Exception as e:
             error_str = str(e).lower()

@@ -69,7 +69,10 @@ import concurrent.futures
 import psycopg2
 import psycopg2.extras
 
-API_TIMEOUT_SECONDS = 45  # Max seconds to wait for a single Gemini API call
+API_TIMEOUT_SECONDS = 90   # Max seconds to wait for a single Gemini API call
+API_MIN_PAUSE      = 2.0  # Minimum pause between all API calls (rate limiting)
+API_MAX_RETRIES    = 3    # How many times to retry a failed call
+API_RETRY_DELAYS   = [5, 15, 30]  # Seconds to wait before each retry attempt
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -90,6 +93,79 @@ logger = logging.getLogger(__name__)
 DOCS_DIR = PROJECT_ROOT / "docs"
 DOCS_DIR.mkdir(parents=True, exist_ok=True)
 EXCEL_OUTPUT = DOCS_DIR / "evaluation_results_III.xlsx"
+
+
+# ============================================================
+# ROBUSTER API-AUFRUF MIT RETRY + EXPONENTIAL BACKOFF
+# ============================================================
+#
+# LERNPUNKT: Was ist Exponential Backoff?
+# Bei einem API-Fehler warten wir, bevor wir es erneut versuchen.
+# Jeder Versuch wartet länger: 5s → 15s → 30s.
+# Warum? Weil ein überlasteter Server Zeit braucht um sich zu erholen.
+# Wenn alle Clients sofort wiederholen, wird der Server noch überlasteter.
+# Mit Backoff geben wir dem Server Zeit zu atmen.
+#
+# Warum 90s Timeout statt 45s?
+# Die Gemini API kann bei hoher Last 60-80 Sekunden brauchen.
+# 45s war zu knapp. 90s gibt genügend Spielraum.
+#
+# Warum 2s Pause zwischen Calls?
+# Gemini Flash: ~60 Requests/Minute im Free Tier.
+# 60s / 60 Requests = 1s/Request als Minimum.
+# Wir nutzen 2s als sicheren Puffer.
+
+def call_gemini_with_retry(
+    prompt: str,
+    system_instruction: str,
+    temperature: float = 0.0,
+    context: str = "",
+) -> dict | None:
+    """
+    Ruft gemini.generate_json() mit automatischem Retry + Backoff auf.
+
+    Args:
+        prompt:             Der Prompt für die KI
+        system_instruction: Die Systemrolle
+        temperature:        Kreativität (0.0 = deterministisch)
+        context:            Beschreibung für Log-Ausgaben
+
+    Returns:
+        Dict mit der KI-Antwort, oder None wenn alle Versuche scheitern
+    """
+    last_error = None
+
+    for attempt in range(API_MAX_RETRIES):
+        if attempt > 0:
+            wait = API_RETRY_DELAYS[attempt - 1]
+            logger.info(f"      ↺ Retry {attempt}/{API_MAX_RETRIES - 1} nach {wait}s Pause ({context})")
+            time.sleep(wait)
+
+        try:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(
+                    gemini.generate_json,
+                    prompt=prompt,
+                    system_instruction=system_instruction,
+                    temperature=temperature,
+                )
+                result = future.result(timeout=API_TIMEOUT_SECONDS)
+
+            # Mindestpause nach jedem erfolgreichen Call (Rate Limiting)
+            time.sleep(API_MIN_PAUSE)
+            return result
+
+        except concurrent.futures.TimeoutError:
+            last_error = f"Timeout nach {API_TIMEOUT_SECONDS}s"
+            logger.warning(f"      ⚠ {context}: {last_error} (Versuch {attempt + 1})")
+
+        except Exception as exc:
+            last_error = str(exc)
+            logger.warning(f"      ⚠ {context}: API-Fehler (Versuch {attempt + 1}): {exc}")
+
+    logger.error(f"      ✗ {context}: Alle {API_MAX_RETRIES} Versuche fehlgeschlagen. Letzter Fehler: {last_error}")
+    return None
+
 
 
 # ============================================================
@@ -176,21 +252,12 @@ def run_stage1(jd: dict, cv: dict) -> dict:
         sector_experience=sector_str,
     )
 
-    try:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(
-                gemini.generate_json,
-                prompt=prompt,
-                system_instruction=STAGE1_SYSTEM,
-                temperature=0.0,
-            )
-            result = future.result(timeout=API_TIMEOUT_SECONDS)
-    except concurrent.futures.TimeoutError:
-        logger.warning(f"    Stufe 1 TIMEOUT ({API_TIMEOUT_SECONDS}s) für {cv.get('anon_ref')}")
-        return {"relevant": False, "score": 0, "reason": "API timeout", "error": "Timeout"}
-    except Exception as exc:
-        logger.warning(f"    Stufe 1 Fehler für {cv.get('anon_ref')}: {exc}")
-        return {"relevant": False, "score": 0, "reason": "API error", "error": str(exc)}
+    result = call_gemini_with_retry(
+        prompt=prompt,
+        system_instruction=STAGE1_SYSTEM,
+        temperature=0.0,
+        context=f"Stufe1 {cv.get('anon_ref')} → {jd.get('title', '')[:30]}",
+    )
 
     if result is None:
         logger.warning(f"    Stufe 1 fehlgeschlagen für {cv.get('anon_ref')} → {jd.get('title')}")
@@ -317,21 +384,12 @@ def run_stage2(jd: dict, cv: dict) -> dict:
         sector_experience=", ".join(sectors[:5]) if sectors else "nicht angegeben",
     )
 
-    try:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(
-                gemini.generate_json,
-                prompt=prompt,
-                system_instruction=STAGE2_SYSTEM,
-                temperature=0.0,
-            )
-            result = future.result(timeout=API_TIMEOUT_SECONDS)
-    except concurrent.futures.TimeoutError:
-        logger.warning(f"    Stufe 2 TIMEOUT ({API_TIMEOUT_SECONDS}s)")
-        result = None
-    except Exception as exc:
-        logger.warning(f"    Stufe 2 Fehler: {exc}")
-        result = None
+    result = call_gemini_with_retry(
+        prompt=prompt,
+        system_instruction=STAGE2_SYSTEM,
+        temperature=0.0,
+        context=f"Stufe2 {cv.get('anon_ref')} → {jd.get('title', '')[:30]}",
+    )
 
     if result is None:
         return {
@@ -340,7 +398,7 @@ def run_stage2(jd: dict, cv: dict) -> dict:
             "total_count": len(requirements),
             "requirements": [],
             "critical_gaps": [],
-            "error": "API error or timeout",
+            "error": "API error or timeout after retries",
         }
 
     return {
@@ -494,40 +552,32 @@ Respond with ONLY this JSON (no extra text):
   "recommendation": "<1-2 sentences explaining the verdict>"
 }"""
 
-    try:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(
-                gemini.generate_json,
-                prompt=stage3_json_prompt,
-                system_instruction=stage3_system,
-                temperature=0.1,
-            )
-            result = future.result(timeout=API_TIMEOUT_SECONDS)
+    result = call_gemini_with_retry(
+        prompt=stage3_json_prompt,
+        system_instruction=stage3_system,
+        temperature=0.1,
+        context=f"Stufe3 {cv.get('anon_ref', '?')} → {jd.get('title', '')[:30]}",
+    )
 
-        if result is None:
-            return {"explanation": "(API returned no result)", "verdict": "Unknown", "error": "No response"}
+    if result is None:
+        return {"explanation": "(API error after retries)", "verdict": "Unknown", "error": "No response"}
 
-        verdict = result.get("verdict", "Possible Match")
-        # Normalise verdict
-        verdict_lower = verdict.lower()
-        if "strong" in verdict_lower:
-            verdict = "Strong Match"
-        elif "weak" in verdict_lower:
-            verdict = "Weak Match"
-        else:
-            verdict = "Possible Match"
+    verdict = result.get("verdict", "Possible Match")
+    verdict_lower = verdict.lower()
+    if "strong" in verdict_lower:
+        verdict = "Strong Match"
+    elif "weak" in verdict_lower:
+        verdict = "Weak Match"
+    else:
+        verdict = "Possible Match"
 
-        explanation = (
-            f"**Strengths**: {result.get('strengths', '')}\n\n"
-            f"**Gaps**: {result.get('gaps', '')}\n\n"
-            f"**Recommendation**: {result.get('recommendation', '')}"
-        )
+    explanation = (
+        f"**Strengths**: {result.get('strengths', '')}\n\n"
+        f"**Gaps**: {result.get('gaps', '')}\n\n"
+        f"**Recommendation**: {result.get('recommendation', '')}"
+    )
 
-        return {"explanation": explanation, "verdict": verdict, "error": None}
-
-    except Exception as e:
-        logger.warning(f"    Stufe 3 fehlgeschlagen: {e}")
-        return {"explanation": f"(failed: {e})", "verdict": "Unknown", "error": str(e)}
+    return {"explanation": explanation, "verdict": verdict, "error": None}
 
 
 # ============================================================
