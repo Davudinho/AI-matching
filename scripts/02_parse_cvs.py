@@ -2,23 +2,28 @@
 scripts/02_parse_cvs.py — Week 2, Task 2: Parse CVs
 
 PURPOSE:
-    Reads every CV file from data/raw/cvs/ (supports .docx and .pdf),
-    extracts plain text, then asks Gemini to extract structured fields
-    (work history, skills, education, etc.) and saves the result as
-    data/processed/cvs_raw.json.
+    Reads every CV file from data/raw/cvs/ and extracts plain text,
+    then asks Gemini to extract structured fields (work history, skills,
+    education, etc.) and saves the result as data/processed/cvs_raw.json.
 
     NOTE: This script keeps PII (names, emails, etc.) in the output.
     The NEXT script (03_anonymise_cvs.py) will remove it.
 
+SUPPORTED FORMATS:
+    .pdf   — textbasiert (native) UND gescannte Bild-PDFs (Gemini Vision OCR)
+    .docx  — modernes Word-Format
+    .doc   — altes Word 97–2003 Format (erfordert MS Word + pywin32)
+    .txt   — einfache Textdateien
+
 HOW TO RUN:
     1. Copy your CV files into: data/raw/cvs/
-       Supported formats: .docx, .pdf
+       Supported formats: .pdf, .docx, .doc, .txt
     2. Make sure GEMINI_API_KEY is set in your .env
     3. From the project root, run:
        python scripts/02_parse_cvs.py
 
 OUTPUT:
-    data/processed/cvs_raw.json   ← Structured CVs (still contains PII)
+    data/processed/cvs_raw.json   <- Structured CVs (still contains PII)
 """
 
 import json
@@ -35,9 +40,7 @@ from dotenv import load_dotenv
 load_dotenv(PROJECT_ROOT / ".env")
 
 from backend.app.services.gemini_service import gemini
-
-import docx        # python-docx: reads .docx files
-import fitz        # PyMuPDF: reads .pdf files (imported as 'fitz')
+from backend.app.services.document_parser import extract_text, SUPPORTED_EXTENSIONS
 
 logging.basicConfig(
     level=logging.INFO,
@@ -56,61 +59,6 @@ PROCESSED_DIR = PROJECT_ROOT / "data" / "processed"
 OUTPUT_FILE = PROCESSED_DIR / "cvs_raw.json"
 
 PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
-
-
-# ============================================================
-# Text Extraction
-# ============================================================
-
-def extract_text_from_docx(filepath: Path) -> str:
-    """Extract plain text from a .docx Word document."""
-    doc = docx.Document(str(filepath))
-    paragraphs = [para.text.strip() for para in doc.paragraphs if para.text.strip()]
-    # Also include tables
-    for table in doc.tables:
-        for row in table.rows:
-            for cell in row.cells:
-                text = cell.text.strip()
-                if text and text not in paragraphs:
-                    paragraphs.append(text)
-    return "\n".join(paragraphs)
-
-
-def extract_text_from_pdf(filepath: Path) -> str:
-    """
-    Extract plain text from a .pdf file using PyMuPDF.
-    
-    PyMuPDF (imported as 'fitz') is one of the fastest PDF libraries.
-    It can handle most PDF types including scanned documents with embedded text.
-    
-    For scanned/image PDFs, we'd need OCR (tesseract) — let's keep it simple for now.
-    """
-    doc = fitz.open(str(filepath))
-    pages_text = []
-
-    for page_num, page in enumerate(doc, start=1):
-        # Extract text with layout preservation
-        # "blocks" mode groups text by position — better structure than "text" mode
-        text = page.get_text("text")
-        if text.strip():
-            pages_text.append(f"[Page {page_num}]\n{text.strip()}")
-
-    doc.close()
-    return "\n\n".join(pages_text)
-
-
-def extract_text(filepath: Path) -> str:
-    """
-    Route a file to the correct text extractor based on its extension.
-    Returns extracted text, or raises an error for unsupported formats.
-    """
-    suffix = filepath.suffix.lower()
-    if suffix == ".docx":
-        return extract_text_from_docx(filepath)
-    elif suffix == ".pdf":
-        return extract_text_from_pdf(filepath)
-    else:
-        raise ValueError(f"Unsupported file format: {suffix}. Only .docx and .pdf are supported.")
 
 
 # ============================================================
@@ -280,12 +228,15 @@ def main():
 
     # Find all supported CV files
     cv_files = sorted(
-        list(CVS_INPUT_DIR.glob("*.docx")) + list(CVS_INPUT_DIR.glob("*.pdf"))
+        f
+        for pattern in ["*.pdf", "*.docx", "*.doc", "*.txt"]
+        for f in CVS_INPUT_DIR.glob(pattern)
     )
 
     if not cv_files:
         logger.error(
-            f"No .docx or .pdf files found in {CVS_INPUT_DIR}\n"
+            f"No supported CV files found in {CVS_INPUT_DIR}\n"
+            f"Supported formats: .pdf, .docx, .doc, .txt\n"
             f"Please copy your CV files there and run again."
         )
         sys.exit(1)
@@ -318,8 +269,11 @@ def main():
         try:
             raw_text = extract_text(cv_file)
 
-            if len(raw_text) < 50:
-                logger.warning(f"  ⚠ Very short document ({len(raw_text)} chars)")
+            if len(raw_text.strip()) < 100:
+                logger.warning(
+                    f"  ⚠ Sehr kurzer Text ({len(raw_text)} Zeichen) — "
+                    f"möglicherweise unlesbares Dokument: {filename}"
+                )
 
             fields = extract_cv_fields(raw_text, filename)
 

@@ -42,9 +42,10 @@ load_dotenv(PROJECT_ROOT / ".env")  # Load .env BEFORE importing settings
 
 from backend.app.services.gemini_service import gemini
 from backend.app.core.config import settings
+from backend.app.services.document_parser import extract_text
 
 # ---- Standard library imports ----
-import docx  # python-docx: reads .docx files
+import docx  # python-docx: reads .docx files (still used for embedding text builder)
 
 # ---- Logging setup ----
 logging.basicConfig(
@@ -274,19 +275,25 @@ def _build_jd_embedding_text(fields: dict) -> str:
 
 def main():
     """
-    Main function: processes all .docx files in data/raw/jds/
-    and saves structured output to data/processed/jds.json
+    Main function: processes all supported JD files in data/raw/jds/
+    (formats: .docx, .pdf, .doc, .txt) and saves structured output
+    to data/processed/jds.json
     """
     logger.info("=" * 60)
     logger.info("Week 2 — Task 1: Parsing Job Descriptions")
     logger.info("=" * 60)
 
-    # Find all .docx files in the input directory
-    jd_files = sorted(JDS_INPUT_DIR.glob("*.docx"))
+    # Find all supported JD files in the input directory
+    jd_files = sorted(
+        f
+        for pattern in ["*.docx", "*.pdf", "*.doc", "*.txt"]
+        for f in JDS_INPUT_DIR.glob(pattern)
+    )
 
     if not jd_files:
         logger.error(
-            f"No .docx files found in {JDS_INPUT_DIR}\n"
+            f"No supported JD files found in {JDS_INPUT_DIR}\n"
+            f"Supported formats: .docx, .pdf, .doc, .txt\n"
             f"Please copy your JD files there and run again."
         )
         sys.exit(1)
@@ -320,8 +327,8 @@ def main():
         logger.info(f"Processing: {filename}")
 
         try:
-            # Step A: Extract plain text from the Word document
-            raw_text = extract_text_from_docx(jd_file)
+            # Step A: Extract plain text from the document
+            raw_text = extract_text(jd_file)
 
             if len(raw_text) < 100:
                 logger.warning(f"  ⚠ Very short document ({len(raw_text)} chars) — may be empty or corrupted")

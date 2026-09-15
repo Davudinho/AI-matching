@@ -28,8 +28,9 @@ google-genai>=1.0.0          # Gemini API client (embeddings + text generation) 
 
 # ---- Document Parsing ----
 python-docx>=1.1.0        # Read .docx Word documents
-PyMuPDF>=1.25.0           # Read .pdf files (also known as fitz) — very fast
+PyMuPDF>=1.25.0           # Read .pdf files (also known as fitz) — fast + renders pages to images for OCR
 pypdf>=5.0.0              # Alternative PDF parser (more robust for some PDFs)
+pywin32>=306; sys_platform == "win32"  # Read old .doc files (Word 97-2003) via MS Word COM automation
 
 # ---- Data Processing ----
 pandas>=2.2.0             # DataFrames — perfect for the evaluation spreadsheet

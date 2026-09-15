@@ -1,60 +1,59 @@
 """
-scripts/08_ai_match.py — 3-stufiges KI-gestütztes Matching
+scripts/08_ai_match.py — 3-Stage AI-Powered Matching
 
-WARUM DIESES SKRIPT?
-    Das alte Embedding-basierte Matching (07_week4_match.py) hat ein
-    fundamentales Problem: Embeddings messen Textähnlichkeit, aber nicht
-    ob ein Kandidat für eine Stelle geeignet ist.
+WHY THIS SCRIPT?
+    The old embedding-based matching (07_week4_match.py) has a fundamental
+    problem: embeddings measure text similarity, but not whether a candidate
+    is actually suitable for a role.
 
-    Ein "Lead Digital Designer" und eine "Delivery Manager"-Stelle haben
-    ähnliche Wörter ("digital", "teams", "delivering") — aber ein Designer
-    ist kein Delivery Manager.
+    A 'Lead Digital Designer' and a 'Delivery Manager' role share similar words
+    ('digital', 'teams', 'delivering') — but a Designer is not a Delivery Manager.
 
-    Dieses Skript verwendet Gemini als intelligenten Recruiter-Agenten,
-    der echtes Verständnis von Berufsrollen hat.
+    This script uses Gemini as an intelligent recruiter agent that has real
+    understanding of professional roles.
 
-DAS 3-STUFIGE SYSTEM:
+THE 3-STAGE SYSTEM:
 
-    STUFE 1: BERUFS-GATE (billig, schnell, binär)
-    ─────────────────────────────────────────────
-    Frage: "Ist dieser Kandidat grundsätzlich für diese Stelle geeignet?"
-    Gemini prüft ob Berufsbild und Karriereweg zur Stelle passen.
-    Output: JA/NEIN + Score 0-10 + 1-Satz-Begründung
+    STAGE 1: PROFESSION GATE (cheap, fast, binary)
+    ───────────────────────────────────────────────
+    Question: 'Is this candidate fundamentally suitable for this role?'
+    Gemini checks whether the candidate's profession and career path fit.
+    Output: YES/NO + Score 0-10 + 1-sentence reason
 
-    STUFE 2: ANFORDERUNGS-SCORING (mittel, detailliert)
-    ────────────────────────────────────────────────────
-    Frage: "Wie gut erfüllt der Kandidat jede konkrete Anforderung?"
-    Gemini bewertet jede essentielle Anforderung aus dem JD einzeln.
-    Output: Score 0-10 pro Anforderung + Belege + Lücken
+    STAGE 2: REQUIREMENTS SCORING (medium, detailed)
+    ─────────────────────────────────────────────────
+    Question: 'How well does the candidate meet each specific requirement?'
+    Gemini scores each essential requirement from the JD individually.
+    Output: Score 0-10 per requirement + evidence + gaps
 
-    STUFE 3: TIEFE KI-ANALYSE (teuer, nur für Top-Kandidaten)
-    ──────────────────────────────────────────────────────────
-    Frage: "Was ist die vollständige Stärken/Schwächen-Analyse?"
-    Gemini schreibt einen strukturierten Match-Report mit Empfehlung.
+    STAGE 3: DEEP AI ANALYSIS (expensive, top candidates only)
+    ───────────────────────────────────────────────────────────
+    Question: 'What is the full strengths/weaknesses analysis?'
+    Gemini writes a structured match report with recommendation.
     Output: Report + Verdict (Strong / Possible / Weak Match)
 
-FUNNEL-EFFEKT:
-    72 Paare → Stufe 1 → ~15-20 → Stufe 2 → Top 5 → Stufe 3 → Final
+FUNNEL EFFECT:
+    160 pairs -> Stage 1 -> ~15-20 -> Stage 2 -> Top 3-5 -> Stage 3 -> Final
 
 HOW TO RUN:
-    # Standard: alle JDs + CVs, alle 3 Stufen, Top 3 für Stufe 3
+    # Standard: all JDs + CVs, all 3 stages, Top 3 for Stage 3
     python scripts/08_ai_match.py
 
-    # Nur Stufe 1 + 2 (kein teures Stufe-3):
+    # Stage 1 + 2 only (skip expensive Stage 3):
     python scripts/08_ai_match.py --max-stage 2
 
-    # Test mit einer einzigen JD:
+    # Test with a single JD:
     python scripts/08_ai_match.py --jd-title "Senior Creative Producer"
 
-    # Mit Recruiter-Filtern:
+    # With recruiter filters:
     python scripts/08_ai_match.py --require-rtw --min-years 4
 
-    # Top N für Stufe 3 (default: 3):
+    # Top N for Stage 3 (default: 3):
     python scripts/08_ai_match.py --top-n 5
 
 OUTPUT:
-    docs/evaluation_results_III.xlsx  — vollständiges Matching-Ergebnis
-    PostgreSQL: ai_match_results Tabelle
+    docs/evaluation_results_III.xlsx  — complete matching results
+    PostgreSQL: ai_match_results table
 """
 
 import argparse
@@ -96,24 +95,24 @@ EXCEL_OUTPUT = DOCS_DIR / "evaluation_results_III.xlsx"
 
 
 # ============================================================
-# ROBUSTER API-AUFRUF MIT RETRY + EXPONENTIAL BACKOFF
+# ROBUST API CALL WITH RETRY + EXPONENTIAL BACKOFF
 # ============================================================
 #
-# LERNPUNKT: Was ist Exponential Backoff?
-# Bei einem API-Fehler warten wir, bevor wir es erneut versuchen.
-# Jeder Versuch wartet länger: 5s → 15s → 30s.
-# Warum? Weil ein überlasteter Server Zeit braucht um sich zu erholen.
-# Wenn alle Clients sofort wiederholen, wird der Server noch überlasteter.
-# Mit Backoff geben wir dem Server Zeit zu atmen.
+# NOTE: What is Exponential Backoff?
+# When an API call fails, we wait before retrying.
+# Each attempt waits longer: 5s -> 15s -> 30s.
+# Why? Because an overloaded server needs time to recover.
+# If all clients retry immediately, the server gets even more overloaded.
+# With backoff we give the server time to breathe.
 #
-# Warum 90s Timeout statt 45s?
-# Die Gemini API kann bei hoher Last 60-80 Sekunden brauchen.
-# 45s war zu knapp. 90s gibt genügend Spielraum.
+# Why 90s timeout instead of 45s?
+# The Gemini API can take 60-80 seconds under high load.
+# 45s was too tight. 90s gives enough headroom.
 #
-# Warum 2s Pause zwischen Calls?
-# Gemini Flash: ~60 Requests/Minute im Free Tier.
-# 60s / 60 Requests = 1s/Request als Minimum.
-# Wir nutzen 2s als sicheren Puffer.
+# Why 2s pause between calls?
+# Gemini Flash: ~60 requests/minute in the free tier.
+# 60s / 60 requests = 1s/request minimum.
+# We use 2s as a safe buffer.
 
 def call_gemini_with_retry(
     prompt: str,
@@ -122,23 +121,23 @@ def call_gemini_with_retry(
     context: str = "",
 ) -> dict | None:
     """
-    Ruft gemini.generate_json() mit automatischem Retry + Backoff auf.
+    Calls gemini.generate_json() with automatic retry + exponential backoff.
 
     Args:
-        prompt:             Der Prompt für die KI
-        system_instruction: Die Systemrolle
-        temperature:        Kreativität (0.0 = deterministisch)
-        context:            Beschreibung für Log-Ausgaben
+        prompt:             The prompt for the AI
+        system_instruction: The system role instruction
+        temperature:        Creativity level (0.0 = deterministic)
+        context:            Description for log output
 
     Returns:
-        Dict mit der KI-Antwort, oder None wenn alle Versuche scheitern
+        Dict with the AI response, or None if all attempts fail
     """
     last_error = None
 
     for attempt in range(API_MAX_RETRIES):
         if attempt > 0:
             wait = API_RETRY_DELAYS[attempt - 1]
-            logger.info(f"      ↺ Retry {attempt}/{API_MAX_RETRIES - 1} nach {wait}s Pause ({context})")
+            logger.info(f"      ↺ Retry {attempt}/{API_MAX_RETRIES - 1} after {wait}s pause ({context})")
             time.sleep(wait)
 
         try:
@@ -151,104 +150,104 @@ def call_gemini_with_retry(
                 )
                 result = future.result(timeout=API_TIMEOUT_SECONDS)
 
-            # Mindestpause nach jedem erfolgreichen Call (Rate Limiting)
+            # Minimum pause after each successful call (rate limiting)
             time.sleep(API_MIN_PAUSE)
             return result
 
         except concurrent.futures.TimeoutError:
-            last_error = f"Timeout nach {API_TIMEOUT_SECONDS}s"
-            logger.warning(f"      ⚠ {context}: {last_error} (Versuch {attempt + 1})")
+            last_error = f"Timeout after {API_TIMEOUT_SECONDS}s"
+            logger.warning(f"      ⚠ {context}: {last_error} (attempt {attempt + 1})")
 
         except Exception as exc:
             last_error = str(exc)
-            logger.warning(f"      ⚠ {context}: API-Fehler (Versuch {attempt + 1}): {exc}")
+            logger.warning(f"      ⚠ {context}: API error (attempt {attempt + 1}): {exc}")
 
-    logger.error(f"      ✗ {context}: Alle {API_MAX_RETRIES} Versuche fehlgeschlagen. Letzter Fehler: {last_error}")
+    logger.error(f"      ✗ {context}: All {API_MAX_RETRIES} attempts failed. Last error: {last_error}")
     return None
 
 
 
 # ============================================================
-# STUFE 1: Berufs-Gate
+# STAGE 1: Profession Gate
 # ============================================================
 #
-# LERNPUNKT: Warum binär und nicht nur ein Score?
-# Weil wir API-Kosten sparen wollen. Stufe 2 kostet 3-5× mehr
-# als Stufe 1. Wenn ein Kandidat klar ungeeignet ist (Score < 5),
-# wäre es Geldverschwendung ihn weiter zu analysieren.
+# NOTE: Why binary and not just a score?
+# To save API costs. Stage 2 costs 3-5x more than Stage 1.
+# If a candidate is clearly unsuitable (score < 5),
+# it would be wasteful to analyse them further.
 #
-# Warum Score UND boolean?
-# Der Score (0-10) erlaubt uns später feinere Analysen.
-# Der boolean ist der harte Gate-Wert für den Funnel.
+# Why both a score AND a boolean?
+# The score (0-10) allows finer analysis later.
+# The boolean is the hard gate value for the funnel.
 
-STAGE1_SYSTEM = """Du bist ein erfahrener UK-Recruiter mit 15 Jahren Erfahrung.
-Du bewertest ob ein Kandidat grundsätzlich für eine Stelle geeignet ist.
-Antworte NUR mit validem JSON. Keine zusätzlichen Erklärungen außerhalb des JSON."""
+STAGE1_SYSTEM = """You are an experienced UK recruiter with 15 years of expertise.
+You assess whether a candidate is fundamentally suitable for a role.
+Respond ONLY with valid JSON. No additional explanations outside the JSON."""
 
-STAGE1_PROMPT = """Beurteile ob dieser Kandidat ein plausibler Bewerber für diese Stelle wäre.
+STAGE1_PROMPT = """Assess whether this candidate would be a plausible applicant for this role.
 
-STELLE:
-- Jobtitel: {jd_title}
+ROLE:
+- Job title: {jd_title}
 - Organisation: {jd_organisation}
-- Bereich: {jd_sector}
-- Kurzbeschreibung (erste Anforderungen): {jd_requirements_preview}
+- Sector: {jd_sector}
+- Key requirements (preview): {jd_requirements_preview}
 
-KANDIDAT:
-- Aktuelle/Letzte Stelle: {cv_title}
-- Berufserfahrung: {years_experience} Jahre
-- Berufliches Profil: {career_summary}
-- Sektoren: {sector_experience}
+CANDIDATE:
+- Current / most recent role: {cv_title}
+- Years of experience: {years_experience}
+- Professional profile: {career_summary}
+- Sectors: {sector_experience}
 
-FRAGE: Ist der Berufsweg dieses Kandidaten relevant für diese Stelle?
+QUESTION: Is this candidate's professional background relevant to this role?
 
-Berücksichtige:
-✓ Passt der Berufstitel des Kandidaten zum gesuchten Profil?
-✓ Ist der Karriereweg zur Stelle logisch und plausibel?
-✓ Würde ein Recruiter diesen CV auch nur in Betracht ziehen?
+Consider:
+✓ Does the candidate's job title match the target profile?
+✓ Is the career path logically consistent with this role?
+✓ Would a recruiter even consider this CV?
 
-WICHTIG: Sei streng. Ein Designer ist kein Finance Officer. 
-Ein Delivery Manager leitet Produktteams — das ist kein kreativer Beruf.
-Nur wenn es wirklich Sinn ergibt: relevant=true.
+IMPORTANT: Be strict. A Designer is not a Finance Officer.
+A Delivery Manager leads product teams — that is not a creative role.
+Only mark relevant=true if it genuinely makes sense.
 
-Antworte NUR mit diesem JSON-Format:
+Respond ONLY with this JSON format:
 {{
-  "relevant": true oder false,
-  "score": <Ganzzahl 0-10: 0=völlig falsch, 10=perfekt passend>,
-  "reason": "<max. 1 präziser Satz auf Englisch>"
+  "relevant": true or false,
+  "score": <integer 0-10: 0=completely wrong, 10=perfect fit>,
+  "reason": "<max. 1 precise sentence in English>"
 }}"""
 
 
 def run_stage1(jd: dict, cv: dict) -> dict:
     """
-    STUFE 1: Prüft ob der Berufsweg des Kandidaten zur Stelle passt.
+    STAGE 1: Checks whether the candidate's career path fits the role.
 
     Args:
-        jd: JD-Daten aus der DB
-        cv: CV-Daten aus der DB
+        jd: JD data from the DB
+        cv: CV data from the DB
 
     Returns:
-        Dict mit: relevant (bool), score (int), reason (str), error (str|None)
+        Dict with: relevant (bool), score (int), reason (str), error (str|None)
 
-    LERNPUNKT: Warum kein Embedding hier?
-    Weil Embeddings den SINN von Berufsrollen nicht verstehen.
-    "Digital Designer" und "Digital Delivery Manager" haben ähnliche
-    Embeddings (beide "digital", beide in Teams) — aber völlig verschiedene
-    Berufe. Gemini versteht den Unterschied.
+    NOTE: Why not use embeddings here?
+    Because embeddings don't understand the MEANING of professional roles.
+    'Digital Designer' and 'Digital Delivery Manager' have similar embeddings
+    (both 'digital', both in teams) — but completely different professions.
+    Gemini understands the difference.
     """
     jd_requirements = jd.get("essential_requirements") or []
-    req_preview = "; ".join(jd_requirements[:3]) if jd_requirements else "Keine spezifizierten Anforderungen"
+    req_preview = "; ".join(jd_requirements[:3]) if jd_requirements else "No requirements specified"
 
     sector_exp = cv.get("sector_experience") or []
-    sector_str = ", ".join(sector_exp[:4]) if sector_exp else "nicht angegeben"
+    sector_str = ", ".join(sector_exp[:4]) if sector_exp else "not stated"
 
     prompt = STAGE1_PROMPT.format(
         jd_title=jd.get("title", ""),
         jd_organisation=jd.get("organisation", ""),
         jd_sector=jd.get("sector", ""),
         jd_requirements_preview=req_preview,
-        cv_title=cv.get("current_title") or "Unbekannt",
-        years_experience=cv.get("years_experience") or "unbekannt",
-        career_summary=cv.get("career_summary") or "Kein Profil verfügbar",
+        cv_title=cv.get("current_title") or "Unknown",
+        years_experience=cv.get("years_experience") or "unknown",
+        career_summary=cv.get("career_summary") or "No profile available",
         sector_experience=sector_str,
     )
 
@@ -256,11 +255,11 @@ def run_stage1(jd: dict, cv: dict) -> dict:
         prompt=prompt,
         system_instruction=STAGE1_SYSTEM,
         temperature=0.0,
-        context=f"Stufe1 {cv.get('anon_ref')} → {jd.get('title', '')[:30]}",
+        context=f"Stage1 {cv.get('anon_ref')} -> {jd.get('title', '')[:30]}",
     )
 
     if result is None:
-        logger.warning(f"    Stufe 1 fehlgeschlagen für {cv.get('anon_ref')} → {jd.get('title')}")
+        logger.warning(f"    Stage 1 failed for {cv.get('anon_ref')} -> {jd.get('title')}")
         return {"relevant": False, "score": 0, "reason": "API error", "error": "No response"}
 
     return {
@@ -272,73 +271,73 @@ def run_stage1(jd: dict, cv: dict) -> dict:
 
 
 # ============================================================
-# STUFE 2: Anforderungs-Scoring
+# STAGE 2: Requirements Scoring
 # ============================================================
 #
-# LERNPUNKT: Warum jede Anforderung einzeln bewerten?
-# Weil ein Gesamt-Score wichtige Details versteckt.
-# "Score: 6/10" sagt nichts aus. Aber:
-#   "Anforderung 1: Agile — 8/10 (Scrum-Zertifikat)"
-#   "Anforderung 2: Film Production — 2/10 (nur Foto)"
-# Das zeigt dem Recruiter genau wo die Stärken und Schwächen liegen.
+# NOTE: Why score each requirement individually?
+# Because an overall score hides important details.
+# 'Score: 6/10' tells you nothing. But:
+#   'Requirement 1: Agile — 8/10 (Scrum certificate)'
+#   'Requirement 2: Film Production — 2/10 (photography only)'
+# This shows the recruiter exactly where the strengths and weaknesses are.
 
-STAGE2_SYSTEM = """Du bist ein erfahrener UK-Recruiter.
-Bewerte präzise und ehrlich wie gut ein Kandidat die Stellenanforderungen erfüllt.
-Nutze NUR Belege aus dem Kandidatenprofil. Erfinde keine Qualifikationen.
-Antworte NUR mit validem JSON."""
+STAGE2_SYSTEM = """You are an experienced UK recruiter.
+Assess precisely and honestly how well a candidate meets the job requirements.
+Use ONLY evidence from the candidate profile. Do not invent qualifications.
+Respond ONLY with valid JSON. All text fields must be in English."""
 
-STAGE2_PROMPT = """Bewerte wie gut dieser Kandidat die essentiellen Stellenanforderungen erfüllt.
+STAGE2_PROMPT = """Assess how well this candidate meets the essential job requirements.
 
-STELLE: {jd_title} bei {jd_organisation}
+ROLE: {jd_title} at {jd_organisation}
 
-ESSENTIELLE ANFORDERUNGEN:
+ESSENTIAL REQUIREMENTS:
 {requirements_numbered}
 
-KANDIDATENPROFIL:
-- Jobtitel: {cv_title}
-- Berufsjahre: {years_experience}
-- Skills (technisch): {skills_technical}
-- Skills (soft): {skills_soft}
-- Berufsverlauf: {work_history_summary}
-- Zertifikate: {certifications}
-- Sektor-Erfahrung: {sector_experience}
+CANDIDATE PROFILE:
+- Job title: {cv_title}
+- Years of experience: {years_experience}
+- Technical skills: {skills_technical}
+- Soft skills: {skills_soft}
+- Work history: {work_history_summary}
+- Certifications: {certifications}
+- Sector experience: {sector_experience}
 
-Bewerte JEDE Anforderung mit einem Score 0-10:
-  0-3: Kein Beleg im CV vorhanden
-  4-6: Teilweise erfüllt — Belege vorhanden, aber Lücken
-  7-9: Gut erfüllt — starke Belege im CV
-  10: Vollständig erfüllt — perfekte Übereinstimmung
+Score EACH requirement from 0 to 10:
+  0-3: No evidence in CV
+  4-6: Partially met — some evidence, but gaps remain
+  7-9: Well met — strong evidence in CV
+  10: Fully met — perfect match
 
-Antworte NUR mit diesem JSON:
+Respond ONLY with this JSON (all text in English):
 {{
   "requirements": [
     {{
-      "requirement": "<exakter Anforderungstext>",
+      "requirement": "<exact requirement text>",
       "score": <0-10>,
-      "evidence": "<konkreter Beleg aus dem CV, oder 'Kein Beleg gefunden'>"
+      "evidence": "<specific evidence from the CV, or 'No evidence found'>"
     }}
   ],
-  "overall_score": <gewichteter Durchschnitt 0-10>,
-  "met_count": <Anzahl Anforderungen mit Score >= 7>,
-  "total_count": <Gesamtzahl der Anforderungen>,
-  "critical_gaps": ["<wichtige fehlende Qualifikation 1>", "<...>"]
+  "overall_score": <weighted average 0-10>,
+  "met_count": <number of requirements with score >= 7>,
+  "total_count": <total number of requirements>,
+  "critical_gaps": ["<key missing qualification 1>", "<...>"]
 }}"""
 
 
 def run_stage2(jd: dict, cv: dict) -> dict:
     """
-    STUFE 2: Bewertet jede essentielle Anforderung einzeln.
+    STAGE 2: Scores each essential requirement individually.
 
-    Läuft nur wenn stage1.relevant = True.
+    Only runs if stage1.relevant = True.
 
     Returns:
-        Dict mit: overall_score, met_count, total_count,
-                  requirements (list), critical_gaps (list), error
+        Dict with: overall_score, met_count, total_count,
+                   requirements (list), critical_gaps (list), error
     """
     requirements = jd.get("essential_requirements") or []
 
     if not requirements:
-        # Keine Anforderungen definiert — nutze Responsibilities als Fallback
+        # No requirements defined — use responsibilities as fallback
         requirements = (jd.get("responsibilities") or [])[:5]
 
     if not requirements:
@@ -347,7 +346,7 @@ def run_stage2(jd: dict, cv: dict) -> dict:
             "met_count": 0,
             "total_count": 0,
             "requirements": [],
-            "critical_gaps": ["Keine Anforderungen in der Stelle definiert"],
+            "critical_gaps": ["No requirements defined in this job description"],
             "error": "No requirements",
         }
 
@@ -360,7 +359,7 @@ def run_stage2(jd: dict, cv: dict) -> dict:
     certs = cv.get("certifications") or []
     sectors = cv.get("sector_experience") or []
 
-    # Berufsverlauf als kurze Zusammenfassung
+    # Work history as short summary
     work_hist = cv.get("work_history") or []
     work_summary_parts = []
     for role in work_hist[:4]:
@@ -369,26 +368,26 @@ def run_stage2(jd: dict, cv: dict) -> dict:
             org = role.get("organisation", "")
             desc = str(role.get("description", ""))[:120]
             work_summary_parts.append(f"{title} @ {org}: {desc}")
-    work_summary = " | ".join(work_summary_parts) if work_summary_parts else "Kein Berufsverlauf"
+    work_summary = " | ".join(work_summary_parts) if work_summary_parts else "No work history available"
 
     prompt = STAGE2_PROMPT.format(
         jd_title=jd.get("title", ""),
         jd_organisation=jd.get("organisation", ""),
         requirements_numbered=requirements_numbered,
-        cv_title=cv.get("current_title") or "Unbekannt",
-        years_experience=cv.get("years_experience") or "unbekannt",
-        skills_technical=", ".join(skills_tech[:15]) if skills_tech else "keine angegeben",
-        skills_soft=", ".join(skills_soft[:8]) if skills_soft else "keine angegeben",
+        cv_title=cv.get("current_title") or "Unknown",
+        years_experience=cv.get("years_experience") or "unknown",
+        skills_technical=", ".join(skills_tech[:15]) if skills_tech else "none stated",
+        skills_soft=", ".join(skills_soft[:8]) if skills_soft else "none stated",
         work_history_summary=work_summary,
-        certifications=", ".join(certs[:5]) if certs else "keine angegeben",
-        sector_experience=", ".join(sectors[:5]) if sectors else "nicht angegeben",
+        certifications=", ".join(certs[:5]) if certs else "none stated",
+        sector_experience=", ".join(sectors[:5]) if sectors else "not stated",
     )
 
     result = call_gemini_with_retry(
         prompt=prompt,
         system_instruction=STAGE2_SYSTEM,
         temperature=0.0,
-        context=f"Stufe2 {cv.get('anon_ref')} → {jd.get('title', '')[:30]}",
+        context=f"Stage2 {cv.get('anon_ref')} -> {jd.get('title', '')[:30]}",
     )
 
     if result is None:
@@ -412,50 +411,50 @@ def run_stage2(jd: dict, cv: dict) -> dict:
 
 
 # ============================================================
-# STUFE 3: Tiefe KI-Analyse
+# STAGE 3: Deep AI Analysis
 # ============================================================
 #
-# LERNPUNKT: Warum erst jetzt den vollen Text verwenden?
-# Weil Stufe 3 die teuerste ist (~1500 Tokens pro Paar).
-# Wenn wir sie für alle 72 Paare laufen lassen würden, wäre das
-# 72 × 1500 = 108.000 Tokens — teuer und langsam.
-# Durch den Funnel laufen hier nur noch 3-5 Kandidaten pro Stelle.
-# Das macht es kostengünstig UND die Erklärungen sind hochwertiger,
-# weil Gemini sich auf echte Kandidaten konzentriert.
+# NOTE: Why use the full text only now?
+# Because Stage 3 is the most expensive (~1500 tokens per pair).
+# Running it for all 160 pairs would be 160 x 1500 = 240,000 tokens
+# — expensive and slow.
+# Through the funnel, only 3-5 candidates per role reach this stage.
+# This keeps costs low AND the explanations are higher quality,
+# because Gemini focuses on genuinely suitable candidates.
 
-STAGE3_SYSTEM = """Du bist ein erfahrener UK-Recruiter der einen Match-Report
-für den Hiring Manager erstellt. Sei konkret, evidenz-basiert und ehrlich.
-Keine leeren Phrasen. Keine Erfindungen. Nur was im CV steht."""
+STAGE3_SYSTEM = """You are a senior UK recruiter writing a match report for a hiring manager.
+Be specific, evidence-based and honest.
+No empty phrases. No inventions. Only what is stated in the CV."""
 
-STAGE3_PROMPT = """Erstelle einen strukturierten Match-Report für den Hiring Manager.
+STAGE3_PROMPT = """Write a structured match report for the hiring manager.
 
-═══ STELLE ═══
-Jobtitel: {jd_title}
+═══ ROLE ═══
+Job title: {jd_title}
 Organisation: {jd_organisation} ({jd_sector})
-Senioritätslevel: {seniority_level}
-Essentiell:
+Seniority level: {seniority_level}
+Essential requirements:
 {essential_requirements}
-Aufgaben:
+Key responsibilities:
 {responsibilities}
 
-═══ KANDIDAT ═══
-Jobtitel: {cv_title}
-Berufsjahre: {years_experience}
-Profil: {career_summary}
+═══ CANDIDATE ═══
+Job title: {cv_title}
+Years of experience: {years_experience}
+Profile: {career_summary}
 Skills: {all_skills}
-Sektoren: {sector_experience}
-Berufsverlauf:
+Sectors: {sector_experience}
+Work history:
 {work_history}
-Ausbildung: {education}
+Education: {education}
 
-═══ STUFE-2-ANALYSE ═══
-Anforderungs-Score: {stage2_score}/10
-Erfüllte Anforderungen: {met_count}/{total_count}
-Kritische Lücken: {critical_gaps}
+═══ STAGE 2 ANALYSIS ═══
+Requirements score: {stage2_score}/10
+Requirements met: {met_count}/{total_count}
+Critical gaps: {critical_gaps}
 Details:
 {requirements_detail}
 
-Schreibe einen professionellen Match-Report auf Englisch (max. 150 Wörter):
+Write a professional match report in English (max. 150 words):
 
 **Strengths** (cite specific evidence from CV):
 [2-3 concrete strengths with evidence]
@@ -470,12 +469,12 @@ Verdict: [Strong Match / Possible Match / Weak Match]
 
 def run_stage3(jd: dict, cv: dict, stage2_result: dict) -> dict:
     """
-    STUFE 3: Vollständige evidenz-basierte Match-Analyse.
+    STAGE 3: Full evidence-based match analysis.
 
-    Läuft nur für Top-Kandidaten (nach stage2_score sortiert).
+    Only runs for top candidates (sorted by stage2_score).
 
     Returns:
-        Dict mit: explanation (str), verdict (str), error (str|None)
+        Dict with: explanation (str), verdict (str), error (str|None)
     """
     skills_tech = cv.get("skills_technical") or []
     skills_soft = cv.get("skills_soft") or []
@@ -487,17 +486,17 @@ def run_stage3(jd: dict, cv: dict, stage2_result: dict) -> dict:
         if isinstance(role, dict):
             title = role.get("title", "")
             org = role.get("organisation", "")
-            dates = f"{role.get('start_date', '')}–{role.get('end_date', '')}"
+            dates = f"{role.get('start_date', '')}-{role.get('end_date', '')}"
             desc = str(role.get("description", ""))[:200]
-            work_lines.append(f"  • {title} @ {org} ({dates}): {desc}")
-    work_str = "\n".join(work_lines) if work_lines else "  Kein Berufsverlauf verfügbar"
+            work_lines.append(f"  * {title} @ {org} ({dates}): {desc}")
+    work_str = "\n".join(work_lines) if work_lines else "  No work history available"
 
     edu = cv.get("education") or []
     edu_parts = []
     for e in edu[:3]:
         if isinstance(e, dict):
             edu_parts.append(f"{e.get('degree', '')} ({e.get('institution', '')})")
-    edu_str = "; ".join(edu_parts) if edu_parts else "Nicht angegeben"
+    edu_str = "; ".join(edu_parts) if edu_parts else "Not stated"
 
     req_detail_lines = []
     for r in (stage2_result.get("requirements") or [])[:8]:
@@ -505,28 +504,28 @@ def run_stage3(jd: dict, cv: dict, stage2_result: dict) -> dict:
             req_detail_lines.append(
                 f"  [{r.get('score', 0)}/10] {r.get('requirement', '')[:60]}: {r.get('evidence', '')[:80]}"
             )
-    req_detail = "\n".join(req_detail_lines) if req_detail_lines else "  Keine Details"
+    req_detail = "\n".join(req_detail_lines) if req_detail_lines else "  No details available"
 
     essential_reqs = "\n".join(
         f"  {i+1}. {r}" for i, r in enumerate((jd.get("essential_requirements") or [])[:6])
     )
     responsibilities = "\n".join(
-        f"  • {r}" for r in (jd.get("responsibilities") or [])[:5]
+        f"  * {r}" for r in (jd.get("responsibilities") or [])[:5]
     )
-    critical_gaps = ", ".join(stage2_result.get("critical_gaps") or []) or "Keine kritischen Lücken identifiziert"
+    critical_gaps = ", ".join(stage2_result.get("critical_gaps") or []) or "No critical gaps identified"
 
     prompt = STAGE3_PROMPT.format(
         jd_title=jd.get("title", ""),
         jd_organisation=jd.get("organisation", ""),
         jd_sector=jd.get("sector", ""),
-        seniority_level=jd.get("seniority_level", "nicht angegeben"),
-        essential_requirements=essential_reqs or "  Keine definiert",
-        responsibilities=responsibilities or "  Keine definiert",
-        cv_title=cv.get("current_title") or "Unbekannt",
-        years_experience=cv.get("years_experience") or "unbekannt",
-        career_summary=cv.get("career_summary") or "Kein Profil",
-        all_skills=", ".join(all_skills) if all_skills else "keine angegeben",
-        sector_experience=", ".join(cv.get("sector_experience") or []) or "nicht angegeben",
+        seniority_level=jd.get("seniority_level", "not stated"),
+        essential_requirements=essential_reqs or "  None defined",
+        responsibilities=responsibilities or "  None defined",
+        cv_title=cv.get("current_title") or "Unknown",
+        years_experience=cv.get("years_experience") or "unknown",
+        career_summary=cv.get("career_summary") or "No profile available",
+        all_skills=", ".join(all_skills) if all_skills else "none stated",
+        sector_experience=", ".join(cv.get("sector_experience") or []) or "not stated",
         work_history=work_str,
         education=edu_str,
         stage2_score=stage2_result.get("overall_score", 0),
@@ -536,7 +535,7 @@ def run_stage3(jd: dict, cv: dict, stage2_result: dict) -> dict:
         requirements_detail=req_detail,
     )
 
-    # Stufe 3 nutzt generate_json mit JSON-Schema für strukturierte Antworten
+    # Stage 3 uses generate_json with JSON schema for structured responses
     stage3_system = (
         "You are a senior UK recruiter writing a match report for a hiring manager. "
         "Be specific, evidence-based and concise. Only use information from the candidate profile. "
@@ -556,7 +555,7 @@ Respond with ONLY this JSON (no extra text):
         prompt=stage3_json_prompt,
         system_instruction=stage3_system,
         temperature=0.1,
-        context=f"Stufe3 {cv.get('anon_ref', '?')} → {jd.get('title', '')[:30]}",
+        context=f"Stage3 {cv.get('anon_ref', '?')} -> {jd.get('title', '')[:30]}",
     )
 
     if result is None:
@@ -581,7 +580,7 @@ Respond with ONLY this JSON (no extra text):
 
 
 # ============================================================
-# Datenbankfunktionen
+# Database functions
 # ============================================================
 
 def get_connection():
@@ -592,7 +591,7 @@ def get_connection():
 
 
 def fetch_all_jds(conn, title_filter: str = None) -> list:
-    """JDs laden — optional nach Titel-Keyword filtern."""
+    """Load JDs — optionally filter by title keyword."""
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
     if title_filter:
@@ -621,7 +620,7 @@ def fetch_all_jds(conn, title_filter: str = None) -> list:
 
 
 def fetch_all_cvs(conn, skip_empty: bool = True) -> list:
-    """CVs laden — leere CVs optional überspringen."""
+    """Load CVs — optionally skip empty CVs (scanned image PDFs)."""
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     cursor.execute("""
         SELECT cv_id, anon_ref, current_title, years_experience,
@@ -639,7 +638,7 @@ def fetch_all_cvs(conn, skip_empty: bool = True) -> list:
     result = []
     for row in rows:
         cv = dict(row)
-        # Leere CVs überspringen (gescannte PDFs ohne Text)
+        # Skip empty CVs (scanned PDFs without text)
         if skip_empty:
             has_data = (
                 cv.get("current_title") or
@@ -648,14 +647,14 @@ def fetch_all_cvs(conn, skip_empty: bool = True) -> list:
                 (cv.get("skills_technical") and len(cv["skills_technical"]) > 0)
             )
             if not has_data:
-                logger.info(f"  ⏭ {cv.get('anon_ref')} übersprungen (leeres CV)")
+                logger.info(f"  ⏭ {cv.get('anon_ref')} skipped (empty CV — scanned PDF)")
                 continue
         result.append(cv)
     return result
 
 
 def save_ai_match(conn, match: dict):
-    """Ein Match-Ergebnis in ai_match_results speichern (Upsert)."""
+    """Save a match result to ai_match_results (upsert)."""
     cursor = conn.cursor()
     cursor.execute("""
         INSERT INTO ai_match_results (
@@ -694,25 +693,25 @@ def save_ai_match(conn, match: dict):
 
 
 # ============================================================
-# Finaler Score berechnen
+# Final score calculation
 # ============================================================
 
 def compute_final_score(s1_score: float, s2_score: float, s3_verdict: str = None) -> float:
     """
-    Gewichteter Gesamtscore aus allen 3 Stufen.
+    Weighted composite score from all 3 stages.
 
-    Gewichtung:
-      30% Stage 1 — grundlegende Berufsrelevanz (wichtig, aber grob)
-      55% Stage 2 — Anforderungserfüllung (wichtigster Faktor!)
-      15% Stage 3 — Tiefe Analyse / Verdict
+    Weights:
+      30% Stage 1 — basic professional relevance (important, but coarse)
+      55% Stage 2 — requirements fulfilment (most important factor!)
+      15% Stage 3 — deep analysis / verdict
 
-    Stage 3 ist optional (nur für Top-Kandidaten).
-    Wenn nicht vorhanden: Gewichtung 30/70 (Stage 1/2).
+    Stage 3 is optional (top candidates only).
+    If not available: weights are 35/65 (Stage 1/2).
 
-    LERNPUNKT: Warum 55% für Stage 2?
-    Weil die Anforderungen DAS Wichtigste sind. Ein Kandidat
-    kann beruflich passen (Stage 1 hoch) aber keine der konkreten
-    Qualifikationen haben (Stage 2 niedrig) — dann ist er nicht geeignet.
+    NOTE: Why 55% for Stage 2?
+    Because the requirements are THE most important factor. A candidate
+    can have the right profession (Stage 1 high) but lack the specific
+    qualifications (Stage 2 low) — in that case they are not suitable.
     """
     s3_map = {"Strong Match": 10.0, "Possible Match": 6.0, "Weak Match": 2.0}
 
@@ -725,65 +724,66 @@ def compute_final_score(s1_score: float, s2_score: float, s3_verdict: str = None
 
 
 # ============================================================
-# Hard Filter (zusätzlich zu den 3 KI-Stufen)
+# Hard filters (in addition to the 3 AI stages)
 # ============================================================
 
 def apply_hard_filter(cv: dict, require_rtw: bool, min_years: int) -> tuple:
     """
-    Binäre harte Filter ZUSÄTZLICH zum KI-Matching.
-    Diese sind nicht KI-basiert — sie sind einfache Regeln.
+    Binary hard filters ADDITIONAL to AI matching.
+    These are not AI-based — they are simple rules.
 
-    Gibt (passed: bool, reason: str) zurück.
+    Returns (passed: bool, reason: str).
     """
-    # RTW-Filter
+    # Right to Work filter
     if require_rtw and cv.get("right_to_work_uk") is False:
-        return False, "Kein UK Right to Work"
+        return False, "No UK Right to Work"
 
-    # Mindest-Erfahrung
+    # Minimum experience
     if min_years and min_years > 0:
         cv_years = cv.get("years_experience")
         if cv_years is not None and int(cv_years) < min_years:
-            return False, f"Zu wenig Erfahrung: {cv_years} Jahre (min. {min_years})"
+            return False, f"Insufficient experience: {cv_years} years (minimum: {min_years})"
 
     return True, ""
 
 
 # ============================================================
-# Excel-Export
+# Excel export (legacy — used when running 08 directly)
 # ============================================================
 
 def export_to_excel(all_results: list):
     """
-    Exportiert alle Ergebnisse in docs/evaluation_results_III.xlsx.
+    Exports all results to docs/evaluation_results_III.xlsx.
 
-    Struktur:
-    - Ein Sheet pro JD (mit Kandidaten sortiert nach final_rank)
-    - Ein 'Alle Ergebnisse' Übersichts-Sheet
-    - Ein 'Anleitung' Sheet
+    Structure:
+    - One sheet per JD (candidates sorted by final_rank)
+    - An 'All Results' overview sheet
+    - A 'Guide' sheet
+
+    NOTE: For the fully-styled English export, use 11_export_results_en.py instead.
     """
     if not all_results:
-        logger.warning("Keine Ergebnisse zum Exportieren")
+        logger.warning("No results to export")
         return
 
     with pd.ExcelWriter(EXCEL_OUTPUT, engine="openpyxl") as writer:
 
-        # Alle Ergebnisse für Übersichts-Sheet
         all_rows = []
 
-        # Gruppiere nach JD
+        # Group by JD
         jds_seen = {}
         for m in all_results:
-            jt = m.get("jd_title", "Unbekannt")
+            jt = m.get("jd_title", "Unknown")
             if jt not in jds_seen:
                 jds_seen[jt] = []
             jds_seen[jt].append(m)
 
         for jd_title, matches in jds_seen.items():
-            # Sortiere: zuerst nach stage1_passed, dann nach final_score
+            # Sort: Stage 1 passed first, then by final_score descending
             matches_sorted = sorted(
                 matches,
                 key=lambda x: (
-                    not x.get("stage1_passed", False),  # Stage1=True zuerst
+                    not x.get("stage1_passed", False),
                     -(x.get("final_score") or 0),
                 ),
             )
@@ -797,49 +797,49 @@ def export_to_excel(all_results: list):
                 ) if s2_reqs else ""
 
                 row = {
-                    # ── Rang & Ergebnis ──
-                    "final_rank":       rank,
-                    "final_score":      m.get("final_score"),
+                    # -- Rank & Score --
+                    "final_rank":         rank,
+                    "final_score":        m.get("final_score"),
 
-                    # ── Stelle ──
-                    "jd_title":         m.get("jd_title"),
-                    "jd_organisation":  m.get("jd_organisation"),
+                    # -- Job --
+                    "jd_title":           m.get("jd_title"),
+                    "jd_organisation":    m.get("jd_organisation"),
 
-                    # ── Kandidat ──
-                    "anon_ref":         m.get("anon_ref"),
-                    "cv_title":         m.get("cv_title"),
-                    "career_summary":   m.get("career_summary"),
-                    "years_experience": m.get("years_experience"),
-                    "right_to_work_uk": m.get("right_to_work_uk"),
+                    # -- Candidate --
+                    "anon_ref":           m.get("anon_ref"),
+                    "cv_title":           m.get("cv_title"),
+                    "career_summary":     m.get("career_summary"),
+                    "years_experience":   m.get("years_experience"),
+                    "right_to_work_uk":   m.get("right_to_work_uk"),
 
-                    # ── Stufe 1: Berufs-Gate ──
-                    "stufe1_relevant":  "✓ JA" if m.get("stage1_passed") else "✗ NEIN",
-                    "stufe1_score":     m.get("stage1_score"),
-                    "stufe1_begruendung": m.get("stage1_reason"),
+                    # -- Stage 1: Profession Gate --
+                    "stage1_passed":      "YES" if m.get("stage1_passed") else "NO",
+                    "stage1_score":       m.get("stage1_score"),
+                    "stage1_reason":      m.get("stage1_reason"),
 
-                    # ── Stufe 2: Anforderungen ──
-                    "stufe2_score":     m.get("stage2_score"),
-                    "stufe2_erfuellt":  f"{m.get('stage2_met_count', 0)}/{m.get('stage2_total_count', 0)} Anforderungen",
-                    "stufe2_luecken":   ", ".join(m.get("stage2_critical_gaps") or []),
-                    "stufe2_details":   s2_detail,
+                    # -- Stage 2: Requirements --
+                    "stage2_score":       m.get("stage2_score"),
+                    "stage2_met":         f"{m.get('stage2_met_count', 0)}/{m.get('stage2_total_count', 0)} requirements",
+                    "stage2_gaps":        ", ".join(m.get("stage2_critical_gaps") or []),
+                    "stage2_details":     s2_detail,
 
-                    # ── Stufe 3: Tiefe Analyse ──
-                    "stufe3_verdict":   m.get("stage3_verdict") or "(nicht analysiert — nicht in Top 5)",
-                    "stufe3_report":    m.get("stage3_explanation") or "(nicht analysiert)",
+                    # -- Stage 3: Deep Analysis --
+                    "stage3_verdict":     m.get("stage3_verdict") or "not analysed — not in Top 3",
+                    "stage3_report":      m.get("stage3_explanation") or "not analysed",
 
-                    # ── Recruiter ausfüllen ──
-                    "recruiter_label":  None,   # 0=Nein, 1=Vielleicht, 2=Ja
-                    "notes":            None,
+                    # -- Recruiter to fill in --
+                    "recruiter_decision": None,   # 0=No | 1=Possible | 2=Good match
+                    "recruiter_notes":    None,
                 }
                 rows.append(row)
                 all_rows.append(row)
 
-            # Sheet-Name: max 31 Zeichen
+            # Sheet name: max 31 chars (Excel limit)
             sheet_name = jd_title[:28] + "..." if len(jd_title) > 31 else jd_title
             df = pd.DataFrame(rows)
             df.to_excel(writer, index=False, sheet_name=sheet_name)
 
-            # Spaltenbreiten
+            # Column widths
             ws = writer.sheets[sheet_name]
             col_widths = {
                 "A": 8, "B": 10, "C": 30, "D": 20, "E": 10, "F": 25,
@@ -849,40 +849,40 @@ def export_to_excel(all_results: list):
             for col_letter, width in col_widths.items():
                 ws.column_dimensions[col_letter].width = width
 
-        # Übersichts-Sheet (alle Stellen)
+        # All Results overview sheet
         if all_rows:
             df_all = pd.DataFrame(all_rows)
             df_all = df_all.sort_values(["jd_title", "final_rank"])
-            df_all.to_excel(writer, index=False, sheet_name="Alle Ergebnisse")
+            df_all.to_excel(writer, index=False, sheet_name="All Results")
 
-        # Anleitung-Sheet
+        # Guide sheet
         pd.DataFrame({
-            "Spalte": [
+            "Column": [
                 "final_rank", "final_score",
-                "stufe1_relevant", "stufe1_score",
-                "stufe2_score", "stufe2_erfuellt", "stufe2_luecken",
-                "stufe3_verdict", "stufe3_report",
-                "recruiter_label",
+                "stage1_passed", "stage1_score",
+                "stage2_score", "stage2_met", "stage2_gaps",
+                "stage3_verdict", "stage3_report",
+                "recruiter_decision",
             ],
-            "Bedeutung": [
-                "Gesamtrang (1 = bester Kandidat pro Stelle)",
-                "Gewichteter Score: 35% Berufsrelevanz + 65% Anforderungen (0-10)",
-                "✓ JA = Beruf passt grundsätzlich | ✗ NEIN = falscher Beruf",
-                "0-10: Wie gut passt der Berufsweg? (0=falsch, 10=perfekt)",
-                "0-10: Wie viele Anforderungen erfüllt? (Wichtigster Wert!)",
-                "z.B. '3/5 Anforderungen' erfüllt (Score >= 7)",
-                "Fehlende Schlüsselqualifikationen",
-                "Strong Match / Possible Match / Weak Match (nur Top-Kandidaten)",
-                "Vollständiger Match-Report von der KI (nur Top-Kandidaten)",
-                "0=Kein Match | 1=Vielleicht | 2=Guter Match — VON DIR AUSFÜLLEN",
+            "Description": [
+                "Overall rank (1 = best candidate for this role)",
+                "Weighted score: 35% profession relevance + 65% requirements (0-10)",
+                "YES = profession fits | NO = wrong profession",
+                "0-10: How well does the career path fit? (0=wrong, 10=perfect)",
+                "0-10: How many requirements met? (Most important value!)",
+                "e.g. '3/5 requirements' met (score >= 7)",
+                "Missing key qualifications",
+                "Strong Match / Possible Match / Weak Match (top candidates only)",
+                "Full AI match report (top candidates only)",
+                "0=No match | 1=Possible | 2=Good match — TO BE FILLED IN BY RECRUITER",
             ],
-        }).to_excel(writer, index=False, sheet_name="Anleitung")
+        }).to_excel(writer, index=False, sheet_name="Guide")
 
-    logger.info(f"✓ Exportiert nach: {EXCEL_OUTPUT}")
+    logger.info(f"Exported to: {EXCEL_OUTPUT}")
 
 
 # ============================================================
-# Haupt-Matching-Funktion
+# Main matching function
 # ============================================================
 
 def match_jd_to_cvs(
@@ -894,34 +894,34 @@ def match_jd_to_cvs(
     min_years: int = None,
 ) -> list:
     """
-    Führt das 3-stufige Matching für eine JD gegen alle CVs durch.
+    Runs the 3-stage matching for one JD against all CVs.
 
     Args:
-        jd:           JD-Dict aus der DB
-        cvs:          Liste aller CV-Dicts
-        max_stage:    Bis zu welcher Stufe analysieren (1, 2 oder 3)
-        top_n_stage3: Wie viele Top-Kandidaten in Stufe 3 analysieren
-        require_rtw:  Nur UK-RTW-Kandidaten
-        min_years:    Mindest-Erfahrungsjahre (Recruiter-Filter)
+        jd:           JD dict from the DB
+        cvs:          List of all CV dicts
+        max_stage:    Up to which stage to analyse (1, 2 or 3)
+        top_n_stage3: How many top candidates to analyse in Stage 3
+        require_rtw:  Only candidates with UK Right to Work
+        min_years:    Minimum years of experience (recruiter filter)
 
     Returns:
-        Liste von Match-Dicts, sortiert nach final_score (absteigend)
+        List of match dicts, sorted by final_score (descending)
     """
     jd_title = jd.get("title", "?")
     jd_id    = jd["jd_id"]
     logger.info(f"\n{'─' * 55}")
-    logger.info(f"JD: '{jd_title}' | {len(cvs)} Kandidaten")
+    logger.info(f"JD: '{jd_title}' | {len(cvs)} candidates")
 
     results = []
 
-    # ── Stufe 1 für alle CVs ──────────────────────────────────
-    logger.info(f"  STUFE 1: Berufs-Gate...")
+    # -- Stage 1 for all CVs --
+    logger.info(f"  STAGE 1: Profession Gate...")
     stage1_passed = []
 
     for cv in cvs:
         anon = cv.get("anon_ref", "?")
 
-        # Hard Filter zuerst (keine API-Kosten)
+        # Hard filter first (no API cost)
         hard_ok, hard_reason = apply_hard_filter(cv, require_rtw, min_years)
 
         s1 = run_stage1(jd, cv)
@@ -939,11 +939,11 @@ def match_jd_to_cvs(
             "right_to_work_uk": cv.get("right_to_work_uk"),
             "hard_filter_passed": hard_ok,
             "hard_filter_reason": hard_reason,
-            # Stufe 1
+            # Stage 1
             "stage1_passed":   s1["relevant"] and hard_ok,
             "stage1_score":    s1["score"],
             "stage1_reason":   s1["reason"],
-            # Stufe 2+3 noch leer
+            # Stage 2+3 not yet filled
             "stage2_score":    None,
             "stage2_met_count": None,
             "stage2_total_count": None,
@@ -951,7 +951,7 @@ def match_jd_to_cvs(
             "stage2_critical_gaps": [],
             "stage3_explanation": None,
             "stage3_verdict":  None,
-            "final_score":     s1["score"] / 10 * 3.5,  # Vorläufig nur Stage 1
+            "final_score":     s1["score"] / 10 * 3.5,  # Preliminary Stage 1 only
             "final_rank":      None,
         }
 
@@ -963,20 +963,20 @@ def match_jd_to_cvs(
             f"    {icon} {anon} ({title_short})"
             f"  score={s1['score']}/10{rtw_note}"
         )
-        logger.info(f"      → {reason_short}")
+        logger.info(f"      -> {reason_short}")
 
         results.append(match)
 
         if s1["relevant"] and hard_ok:
             stage1_passed.append((match, cv))
 
-    logger.info(f"  Stufe 1: {len(stage1_passed)}/{len(cvs)} bestanden")
+    logger.info(f"  Stage 1: {len(stage1_passed)}/{len(cvs)} passed")
 
     if max_stage < 2 or not stage1_passed:
         return results
 
-    # ── Stufe 2 für alle Stage-1-Bestehenden ─────────────────
-    logger.info(f"  STUFE 2: Anforderungs-Scoring ({len(stage1_passed)} Kandidaten)...")
+    # -- Stage 2 for all Stage 1 passers --
+    logger.info(f"  STAGE 2: Requirements Scoring ({len(stage1_passed)} candidates)...")
 
     for match, cv in stage1_passed:
         s2 = run_stage2(jd, cv)
@@ -988,7 +988,7 @@ def match_jd_to_cvs(
         match["stage2_breakdown"]     = s2["requirements"]
         match["stage2_critical_gaps"] = s2["critical_gaps"]
 
-        # Vorläufiger final_score (ohne Stage 3)
+        # Preliminary final_score (without Stage 3)
         match["final_score"] = compute_final_score(
             s1_score=match["stage1_score"],
             s2_score=s2["overall_score"],
@@ -997,14 +997,14 @@ def match_jd_to_cvs(
         logger.info(
             f"    {match['anon_ref']}: "
             f"score={s2['overall_score']:.1f}/10  "
-            f"erfüllt={s2['met_count']}/{s2['total_count']}  "
-            f"→ final={match['final_score']:.2f}"
+            f"met={s2['met_count']}/{s2['total_count']}  "
+            f"-> final={match['final_score']:.2f}"
         )
 
     if max_stage < 3:
         return results
 
-    # ── Stufe 3: Nur Top-N nach Stage 2 ──────────────────────
+    # -- Stage 3: Top N by Stage 2 score --
     stage2_sorted = sorted(
         [(m, cv) for (m, cv) in stage1_passed if m["stage2_score"] is not None],
         key=lambda x: x[0]["stage2_score"],
@@ -1012,7 +1012,7 @@ def match_jd_to_cvs(
     )
     top_candidates = stage2_sorted[:top_n_stage3]
 
-    logger.info(f"  STUFE 3: Tiefe Analyse für Top {len(top_candidates)} Kandidaten...")
+    logger.info(f"  STAGE 3: Deep Analysis for Top {len(top_candidates)} candidates...")
 
     for match, cv in top_candidates:
         s2_result = {
@@ -1038,10 +1038,10 @@ def match_jd_to_cvs(
         logger.info(
             f"    {match['anon_ref']}: "
             f"Verdict={s3['verdict']}  "
-            f"→ final={match['final_score']:.2f}"
+            f"-> final={match['final_score']:.2f}"
         )
 
-    # ── Ranking berechnen ─────────────────────────────────────
+    # -- Calculate final ranking --
     results_sorted = sorted(results, key=lambda x: (
         not x.get("stage1_passed", False),
         -(x.get("final_score") or 0),
@@ -1052,7 +1052,7 @@ def match_jd_to_cvs(
     top_final = [m for m in results_sorted if m.get("stage1_passed")]
     if top_final:
         logger.info(
-            f"\n  🏆 TOP MATCH: {top_final[0]['anon_ref']} "
+            f"\n  TOP MATCH: {top_final[0]['anon_ref']} "
             f"({top_final[0].get('cv_title', '?')}) "
             f"| Score: {top_final[0]['final_score']:.2f} "
             f"| Verdict: {top_final[0].get('stage3_verdict', 'n/a')}"
@@ -1067,41 +1067,41 @@ def match_jd_to_cvs(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="08_ai_match.py — 3-stufiges KI-Matching"
+        description="08_ai_match.py — 3-stage AI-powered candidate matching"
     )
     parser.add_argument("--max-stage",    type=int, default=3, choices=[1, 2, 3],
-                        help="Bis zu welcher Stufe analysieren (default: 3)")
+                        help="Maximum stage to run (default: 3)")
     parser.add_argument("--top-n",        type=int, default=3,
-                        help="Top N Kandidaten für Stufe 3 (default: 3)")
+                        help="Top N candidates for Stage 3 deep analysis (default: 3)")
     parser.add_argument("--jd-title",     type=str, default=None,
-                        help="Nur JDs mit diesem Keyword im Titel verarbeiten")
+                        help="Only process JDs whose title contains this keyword")
     parser.add_argument("--require-rtw",  action="store_true", default=False,
-                        help="Nur Kandidaten mit UK Right to Work")
+                        help="Only candidates with UK Right to Work")
     parser.add_argument("--min-years",    type=int, default=None,
-                        help="Mindest-Erfahrungsjahre")
+                        help="Minimum years of experience")
     args = parser.parse_args()
 
     logger.info("=" * 60)
-    logger.info("3-stufiges KI-Matching — Diversifying.io")
+    logger.info("3-Stage AI Matching — Diversifying.io")
     logger.info("=" * 60)
-    logger.info(f"  Max. Stufe:    {args.max_stage}")
-    logger.info(f"  Top N (Stufe 3): {args.top_n}")
+    logger.info(f"  Max stage:       {args.max_stage}")
+    logger.info(f"  Top N (Stage 3): {args.top_n}")
     if args.jd_title:
-        logger.info(f"  JD-Filter:     Titel enthält '{args.jd_title}'")
+        logger.info(f"  JD filter:       title contains '{args.jd_title}'")
     if args.require_rtw:
-        logger.info(f"  Filter:        Nur UK Right to Work")
+        logger.info(f"  Filter:          UK Right to Work only")
     if args.min_years:
-        logger.info(f"  Filter:        Min. {args.min_years} Jahre Erfahrung")
+        logger.info(f"  Filter:          Min. {args.min_years} years experience")
 
     conn = get_connection()
     try:
         jds = fetch_all_jds(conn, title_filter=args.jd_title)
         cvs = fetch_all_cvs(conn, skip_empty=True)
 
-        logger.info(f"\nGeladen: {len(jds)} JD(s) | {len(cvs)} CV(s) (leere übersprungen)")
+        logger.info(f"\nLoaded: {len(jds)} JD(s) | {len(cvs)} CV(s) (empty skipped)")
 
         if not jds or not cvs:
-            logger.error("Keine Daten. Zuerst Skripte 01-05 ausführen.")
+            logger.error("No data found. Please run scripts 01-05 first.")
             sys.exit(1)
 
         all_results = []
@@ -1116,18 +1116,18 @@ def main():
                 min_years=args.min_years,
             )
 
-            # In DB speichern
+            # Save to DB
             for m in jd_results:
                 save_ai_match(conn, m)
 
             all_results.extend(jd_results)
 
-        # Excel exportieren
+        # Export to Excel
         logger.info(f"\n{'=' * 60}")
-        logger.info("Export...")
+        logger.info("Exporting...")
         export_to_excel(all_results)
 
-        # Zusammenfassung
+        # Summary
         total_pairs  = len(all_results)
         s1_passed    = sum(1 for m in all_results if m.get("stage1_passed"))
         s3_done      = sum(1 for m in all_results if m.get("stage3_verdict"))
@@ -1135,18 +1135,18 @@ def main():
         possible     = sum(1 for m in all_results if m.get("stage3_verdict") == "Possible Match")
 
         logger.info(f"{'=' * 60}")
-        logger.info("ZUSAMMENFASSUNG")
+        logger.info("SUMMARY")
         logger.info(f"{'=' * 60}")
-        logger.info(f"  Gesamte Paare analysiert: {total_pairs}")
-        logger.info(f"  Stufe 1 bestanden:        {s1_passed}/{total_pairs} Paare")
-        logger.info(f"  Stufe 3 (Deep Analysis):  {s3_done} Kandidaten")
-        logger.info(f"  → Strong Match:           {strong}")
-        logger.info(f"  → Possible Match:         {possible}")
-        logger.info(f"\n  📊 Output: {EXCEL_OUTPUT}")
-        logger.info("\nNÄCHSTE SCHRITTE:")
-        logger.info("  1. docs/evaluation_results_III.xlsx öffnen")
-        logger.info("  2. Zeilen mit stufe1_relevant=✓ prüfen")
-        logger.info("  3. recruiter_label (0/1/2) ausfüllen")
+        logger.info(f"  Total pairs analysed:  {total_pairs}")
+        logger.info(f"  Stage 1 passed:        {s1_passed}/{total_pairs} pairs")
+        logger.info(f"  Stage 3 (Deep):        {s3_done} candidates")
+        logger.info(f"  -> Strong Match:       {strong}")
+        logger.info(f"  -> Possible Match:     {possible}")
+        logger.info(f"\n  Output: {EXCEL_OUTPUT}")
+        logger.info("\nNEXT STEPS:")
+        logger.info("  1. Run: python scripts/11_export_results_en.py")
+        logger.info("  2. Open docs/evaluation_results_EN.xlsx")
+        logger.info("  3. Fill in 'recruiter_decision' column (0/1/2)")
 
     finally:
         conn.close()

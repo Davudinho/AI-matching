@@ -1,6 +1,6 @@
 # Diversifying.io — Dataset Documentation
 
-**Generated:** 2026-08-13 11:17  
+**Generated:** 2026-09-14 16:19  
 **Week:** 2 (Data Preparation)  
 **Status:** Complete
 
@@ -20,8 +20,8 @@ experiments.
 | Metric | Value |
 |--------|-------|
 | Job Descriptions | 8 |
-| Candidate CVs (anonymised) | 9 |
-| Possible JD × CV pairs | 72 |
+| Candidate CVs (anonymised) | 22 |
+| Possible JD × CV pairs | 176 |
 
 ---
 
@@ -37,7 +37,7 @@ All JDs are in the public domain (advertised roles).
 |--------|-------|
 | Total JDs | 8 |
 | JDs with salary info | 8 / 8 |
-| JDs with technical skills | 7 / 8 |
+| JDs with technical skills | 8 / 8 |
 | Total validation warnings | 1 |
 
 ### Sector Breakdown
@@ -92,11 +92,11 @@ Each candidate is referred to by an anonymous reference (e.g. `CAND-001`).
 
 | Metric | Value |
 |--------|-------|
-| Total CVs | 9 |
-| CVs with years of experience | 6 / 9 |
-| CVs with technical skills | 6 / 9 |
-| CVs with UK right-to-work stated | 2 / 9 |
-| Total validation warnings | 15 |
+| Total CVs | 22 |
+| CVs with years of experience | 17 / 22 |
+| CVs with technical skills | 18 / 22 |
+| CVs with UK right-to-work stated | 2 / 22 |
+| Total validation warnings | 21 |
 
 ### Fields in Anonymised Dataset
 
@@ -123,7 +123,7 @@ Each candidate is referred to by an anonymous reference (e.g. `CAND-001`).
 
 ### Known Limitations
 
-1. **Small dataset size**: 8 JDs and 9 CVs is a small sample.
+1. **Small dataset size**: 8 JDs and 22 CVs is a small sample.
    AI matching quality metrics will be indicative, not statistically robust.
    
 2. **AI extraction accuracy**: Fields were extracted by Gemini (LLM). 
