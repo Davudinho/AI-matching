@@ -241,8 +241,12 @@ def evaluate_ml_model(df: pd.DataFrame) -> dict | None:
             model=model,
             feature_names=feature_names,
             stage1_score=row.get("stage1_score", 0),
+            stage1_passed=row.get("stage1_passed", False),
             stage2_score=row.get("stage2_score_num", 0),
+            stage2_met_count=row.get("stage2_met", 0),
+            stage2_total_count=row.get("stage2_total", 0),
             stage3_verdict=row.get("stage3_verdict"),
+            final_score=row.get("final_score", 0),
             years_experience=row.get("years_experience"),
             right_to_work_uk=row.get("right_to_work_uk_bool"),
         )

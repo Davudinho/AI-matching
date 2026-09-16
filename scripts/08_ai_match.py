@@ -81,6 +81,11 @@ load_dotenv(PROJECT_ROOT / ".env")
 
 from backend.app.services.gemini_service import gemini
 from backend.app.core.config import settings
+from scripts.match_config import (
+    get_top_match_threshold,
+    load_calibration_model,
+    predict_ml_confidence,
+)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -663,8 +668,9 @@ def save_ai_match(conn, match: dict):
             stage2_score, stage2_met_count, stage2_total_count,
             stage2_breakdown, stage2_critical_gaps,
             stage3_explanation, stage3_verdict,
-            final_score, final_rank
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            final_score, final_rank,
+            is_top_match, ml_predicted_label, ml_confidence
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (jd_id, cv_id) DO UPDATE SET
             stage1_passed    = EXCLUDED.stage1_passed,
             stage1_score     = EXCLUDED.stage1_score,
@@ -678,6 +684,9 @@ def save_ai_match(conn, match: dict):
             stage3_verdict   = EXCLUDED.stage3_verdict,
             final_score      = EXCLUDED.final_score,
             final_rank       = EXCLUDED.final_rank,
+            is_top_match     = EXCLUDED.is_top_match,
+            ml_predicted_label = EXCLUDED.ml_predicted_label,
+            ml_confidence    = EXCLUDED.ml_confidence,
             created_at       = NOW()
     """, (
         match["jd_id"], match["cv_id"],
@@ -687,6 +696,9 @@ def save_ai_match(conn, match: dict):
         json.dumps(match.get("stage2_critical_gaps") or []),
         match.get("stage3_explanation"), match.get("stage3_verdict"),
         match.get("final_score"), match.get("final_rank"),
+        match.get("is_top_match", False),
+        match.get("ml_predicted_label"),
+        match.get("ml_confidence"),
     ))
     conn.commit()
     cursor.close()
@@ -800,6 +812,8 @@ def export_to_excel(all_results: list):
                     # -- Rank & Score --
                     "final_rank":         rank,
                     "final_score":        m.get("final_score"),
+                    "is_top_match":       "YES" if m.get("is_top_match") else "NO",
+                    "ml_confidence":      round(m.get("ml_confidence"), 3) if m.get("ml_confidence") is not None else None,
 
                     # -- Job --
                     "jd_title":           m.get("jd_title"),
@@ -1041,13 +1055,40 @@ def match_jd_to_cvs(
             f"-> final={match['final_score']:.2f}"
         )
 
-    # -- Calculate final ranking --
+    # -- Calculate final ranking, role-specific threshold check & ML calibration --
     results_sorted = sorted(results, key=lambda x: (
         not x.get("stage1_passed", False),
         -(x.get("final_score") or 0),
     ))
+
+    threshold = get_top_match_threshold(jd_title)
+    ml_model, ml_features = load_calibration_model()
+
     for rank, m in enumerate(results_sorted, start=1):
         m["final_rank"] = rank
+        final_score = m.get("final_score") or 0.0
+        stage1_passed = bool(m.get("stage1_passed"))
+        m["is_top_match"] = bool(stage1_passed and final_score >= threshold)
+
+        if ml_model is not None:
+            ml_res = predict_ml_confidence(
+                model=ml_model,
+                feature_names=ml_features,
+                stage1_score=m.get("stage1_score", 0),
+                stage1_passed=stage1_passed,
+                stage2_score=m.get("stage2_score", 0),
+                stage2_met_count=m.get("stage2_met_count", 0),
+                stage2_total_count=m.get("stage2_total_count", 0),
+                stage3_verdict=m.get("stage3_verdict"),
+                final_score=final_score,
+                years_experience=m.get("years_experience"),
+                right_to_work_uk=m.get("right_to_work_uk"),
+            )
+            m["ml_predicted_label"] = ml_res.get("ml_predicted_label")
+            m["ml_confidence"] = ml_res.get("ml_confidence")
+        else:
+            m["ml_predicted_label"] = None
+            m["ml_confidence"] = None
 
     top_final = [m for m in results_sorted if m.get("stage1_passed")]
     if top_final:
@@ -1055,6 +1096,8 @@ def match_jd_to_cvs(
             f"\n  TOP MATCH: {top_final[0]['anon_ref']} "
             f"({top_final[0].get('cv_title', '?')}) "
             f"| Score: {top_final[0]['final_score']:.2f} "
+            f"| Threshold: {threshold:.2f} (TopMatch={top_final[0]['is_top_match']}) "
+            f"| ML Conf: {top_final[0].get('ml_confidence', 0.0) or 0.0:.2f} "
             f"| Verdict: {top_final[0].get('stage3_verdict', 'n/a')}"
         )
 

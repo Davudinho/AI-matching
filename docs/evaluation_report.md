@@ -1,6 +1,6 @@
 # Evaluation Report — Diversifying.io AI Matching
 
-**Generated:** 2026-09-16 16:29
+**Generated:** 2026-09-16 17:33
 
 > [!WARNING]
 > The current Recruiter_Label values are **AI-generated bootstrap labels** (from Perplexity).
@@ -61,4 +61,9 @@ Default threshold: **6.0**
 
 ## ML Calibration Model
 
-*No trained model found. Run `python scripts/14_train_calibration_model.py` to train.*
+| Metric | Value |
+|---|---|
+| F1 (Top Match) | 1.0 |
+| Precision | 1.0 |
+| Recall | 1.0 |
+| TP / FP / FN / TN | 6 / 0 / 0 / 170 |

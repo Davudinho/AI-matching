@@ -45,7 +45,7 @@ EXCEL_OUTPUT = PROJECT_ROOT / "docs" / "evaluation_results_EN.xlsx"
 # ============================================================
 
 COL_KEYS = [
-    "rank", "final_score",
+    "rank", "final_score", "is_top_match", "ml_confidence",
     "job_title", "organisation",
     "candidate_ref", "candidate_title", "years_experience",
     "profession_domain", "right_to_work_uk", "career_summary",
@@ -58,6 +58,8 @@ COL_KEYS = [
 COL_HEADERS = {
     "rank":                "Rank",
     "final_score":         "Final Score",
+    "is_top_match":        "Top Match?",
+    "ml_confidence":       "ML Confidence",
     "job_title":           "Job Title",
     "organisation":        "Organisation",
     "candidate_ref":       "Candidate Ref",
@@ -82,6 +84,8 @@ COL_HEADERS = {
 COL_WIDTHS = {
     "rank":                6,
     "final_score":         11,
+    "is_top_match":        12,
+    "ml_confidence":       14,
     "job_title":           28,
     "organisation":        22,
     "candidate_ref":       14,
@@ -122,6 +126,7 @@ def fetch_results(conn) -> list[dict]:
             r.stage2_breakdown, r.stage2_critical_gaps,
             r.stage3_explanation, r.stage3_verdict,
             r.final_score, r.final_rank,
+            r.is_top_match, r.ml_confidence, r.recruiter_label,
             j.title AS jd_title, j.organisation AS jd_organisation,
             c.anon_ref, c.current_title, c.years_experience,
             c.profession_domain, c.career_summary, c.right_to_work_uk
@@ -317,6 +322,8 @@ def build_row(rank: int, m: dict) -> dict:
     return {
         "rank":                rank,
         "final_score":         round(m.get("final_score") or 0, 2),
+        "is_top_match":        "YES" if m.get("is_top_match") else "NO",
+        "ml_confidence":       round(m.get("ml_confidence"), 3) if m.get("ml_confidence") is not None else "",
         "job_title":           m.get("jd_title", ""),
         "organisation":        m.get("jd_organisation", ""),
         "candidate_ref":       m.get("anon_ref", ""),
@@ -334,7 +341,7 @@ def build_row(rank: int, m: dict) -> dict:
         "critical_gaps":       gaps_label,
         "stage3_verdict":      s3_verdict_label,
         "stage3_report":       s3_report_label,
-        "recruiter_decision":  "",
+        "recruiter_decision":  m.get("recruiter_label", "") if m.get("recruiter_label") is not None else "",
         "recruiter_notes":     "",
     }
 
@@ -375,6 +382,7 @@ def apply_styles(ws, col_keys: list[str]):
     ws.row_dimensions[1].height = 32
 
     # Column index lookup
+    top_col = col_keys.index("is_top_match") + 1 if "is_top_match" in col_keys else None
     s1_col  = col_keys.index("stage1_passed") + 1  if "stage1_passed"  in col_keys else None
     s3_col  = col_keys.index("stage3_verdict") + 1 if "stage3_verdict" in col_keys else None
     rec_cols = {
@@ -398,6 +406,13 @@ def apply_styles(ws, col_keys: list[str]):
                 cell.fill = PatternFill("solid", fgColor=C_REC)
             elif alt:
                 cell.fill = PatternFill("solid", fgColor=C_ALT)
+
+            # Top Match colour
+            if c == top_col and cell.value:
+                v = str(cell.value).upper()
+                if "YES" in v:
+                    cell.fill = PatternFill("solid", fgColor=C_STRONG)
+                    cell.font = Font(name="Calibri", size=9, bold=True, color=C_YES_FG)
 
             # Stage 1 colour
             if c == s1_col and cell.value:
@@ -427,7 +442,7 @@ def apply_styles(ws, col_keys: list[str]):
         ws.column_dimensions[get_column_letter(i)].width = COL_WIDTHS.get(key, 15)
 
     # Freeze panes & filter
-    ws.freeze_panes = "C2"
+    ws.freeze_panes = "E2"
     ws.auto_filter.ref = ws.dimensions
 
 
@@ -441,6 +456,12 @@ GUIDE_ROWS = [
     ("final_score (0–10)",
      "Weighted composite: 30% Stage 1 + 55% Stage 2 + 15% Stage 3. "
      "If Stage 3 not run: 35% Stage 1 + 65% Stage 2."),
+    ("Top Match?",
+     "YES = Final score meets or exceeds the role-specific calibrated threshold. "
+     "NO = Below threshold for this specific role category."),
+    ("ML Confidence",
+     "Calibrated probability (0.00 to 1.00) from the machine learning model, "
+     "estimating likelihood of being a top interview match based on historical feedback."),
     ("Stage 1: Passed?",
      "YES = Candidate's professional background fits this role. "
      "NO = Wrong profession — Stages 2 & 3 were not run (cost saving)."),

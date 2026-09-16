@@ -18,7 +18,7 @@ experiments.
 ## Dataset Summary
 
 | Metric | Value |
-|--------|-------|
+| --- | --- |
 | Job Descriptions | 8 |
 | Candidate CVs (anonymised) | 22 |
 | Possible JD × CV pairs | 176 |
@@ -28,13 +28,14 @@ experiments.
 ## Job Descriptions
 
 ### Sources
+
 JDs were collected from UNICEF UK and similar UK-based organisations.
 All JDs are in the public domain (advertised roles).
 
-### Statistics
+### JD Statistics
 
 | Metric | Value |
-|--------|-------|
+| --- | --- |
 | Total JDs | 8 |
 | JDs with salary info | 8 / 8 |
 | JDs with technical skills | 8 / 8 |
@@ -43,14 +44,14 @@ All JDs are in the public domain (advertised roles).
 ### Sector Breakdown
 
 | Sector | Count |
-|--------|-------|
+| --- | --- |
 | Charity | 7 |
 | Government | 1 |
 
 ### Fields Extracted
 
 | Field | Type | Description |
-|-------|------|-------------|
+| --- | --- | --- |
 | `jd_id` | UUID | Unique identifier |
 | `filename` | String | Source filename |
 | `title` | String | Job title |
@@ -76,6 +77,7 @@ All JDs are in the public domain (advertised roles).
 ### Privacy & GDPR
 
 All CVs have been **anonymised** in compliance with UK GDPR:
+
 - Full names → `[NAME]`
 - Email addresses → `[EMAIL]`
 - Phone numbers → `[PHONE]`
@@ -88,10 +90,10 @@ access-restricted, and excluded from version control.
 
 Each candidate is referred to by an anonymous reference (e.g. `CAND-001`).
 
-### Statistics
+### Candidate Statistics
 
 | Metric | Value |
-|--------|-------|
+| --- | --- |
 | Total CVs | 22 |
 | CVs with years of experience | 17 / 22 |
 | CVs with technical skills | 18 / 22 |
@@ -101,7 +103,7 @@ Each candidate is referred to by an anonymous reference (e.g. `CAND-001`).
 ### Fields in Anonymised Dataset
 
 | Field | Type | Description |
-|-------|------|-------------|
+| --- | --- | --- |
 | `cv_id` | UUID | Unique identifier |
 | `anon_ref` | String | Anonymous reference (CAND-001, etc.) |
 | `current_title` | String | Most recent job title |
@@ -125,8 +127,8 @@ Each candidate is referred to by an anonymous reference (e.g. `CAND-001`).
 
 1. **Small dataset size**: 8 JDs and 22 CVs is a small sample.
    AI matching quality metrics will be indicative, not statistically robust.
-   
-2. **AI extraction accuracy**: Fields were extracted by Gemini (LLM). 
+
+2. **AI extraction accuracy**: Fields were extracted by Gemini (LLM).
    Accuracy is high for well-structured documents but may miss nuance in
    free-form or unusually formatted documents.
 
@@ -161,7 +163,7 @@ python scripts/04_build_dataset.py
 ## Files
 
 | File | Description | Sensitive? |
-|------|-------------|------------|
+| --- | --- | --- |
 | `data/processed/jds.json` | Structured JD dataset | No |
 | `data/processed/cvs_anonymised.json` | Anonymised CV dataset | No |
 | `data/processed/cvs_raw.json` | Raw CV dataset with PII | **YES** |

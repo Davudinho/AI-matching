@@ -6,7 +6,7 @@
     "Senior Finance Officer": 6.75
   },
   "metadata": {
-    "generated_at": "2026-09-16T14:29:45.894110+00:00",
+    "generated_at": "2026-09-16T15:33:39.286153+00:00",
     "source": "scripts/12_evaluate_model.py",
     "labels_source": "AI-generated bootstrap (Perplexity) — replace with real recruiter data in production",
     "global_f1": 0.9231,

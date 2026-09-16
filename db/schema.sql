@@ -216,6 +216,12 @@ CREATE TABLE IF NOT EXISTS ai_match_results (
     final_score     FLOAT,         -- Weighted: 35% Stage1 + 65% Stage2 (+ Stage3 if run)
     final_rank      INT,           -- Rank among all candidates for this JD
 
+    -- Recruiter Evaluation & ML Calibration (Implicit Feedback / Calibration)
+    recruiter_label     INT CHECK (recruiter_label IN (0, 1, 2)), -- 0=Reject, 1=Possible (Shortlist), 2=Top Match (Interview)
+    is_top_match        BOOLEAN DEFAULT FALSE,                     -- True if candidate passes threshold for this role
+    ml_predicted_label  INT,                                       -- ML model prediction (0, 1, 2)
+    ml_confidence       FLOAT,                                     -- Calibrated probability for Top Match
+
     created_at      TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(jd_id, cv_id)
 );

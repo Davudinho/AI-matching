@@ -14,7 +14,7 @@ Dieses Dokument bietet eine vollständige, strukturierte und technisch präzise 
 
 ## 2. Architektur & Datenfluss
 
-```
+```text
 [ Dokumente (PDF, DOCX, DOC, TXT) ]
                 │
                 ▼
@@ -61,7 +61,8 @@ Dieses Dokument bietet eine vollständige, strukturierte und technisch präzise 
 
 ## 3. Datenmodell für das Matching
 
-### Aus Job Descriptions (JDs) extrahierte Features:
+### Aus Job Descriptions (JDs) extrahierte Features
+
 * `title`: Rollenbezeichnung (z. B. "Senior Finance Officer", "Delivery Manager")
 * `organisation`: Einstellende Organisation
 * `sector`: Branche (z. B. Charity, Public Sector, NGO, Tech)
@@ -74,7 +75,8 @@ Dieses Dokument bietet eine vollständige, strukturierte und technisch präzise 
 * `profession_domain`: Fachbereich (z. B. Finance, Procurement, Digital Delivery)
 * `min_years_experience`: Mindestberufserfahrung in Jahren
 
-### Aus Kandidaten-CVs extrahierte Features:
+### Aus Kandidaten-CVs extrahierte Features
+
 * `anon_ref`: Anonyme Kennung (z. B. `CAND-001`, `CAND-010`)
 * `current_title`: Aktuelle bzw. letzte Position
 * `years_experience`: Gesamte Berufserfahrung (Jahre)
@@ -96,6 +98,7 @@ Dieses Dokument bietet eine vollständige, strukturierte und technisch präzise 
 * **Vektordatenbank:** **PostgreSQL mit pgvector-Erweiterung**.
 * **Index & Distanzmaß:** IVFFlat / HNSW mit **Kosinus-Distanz** (`<=>` Operator in pgvector).
 * **Vektorsuche (API-Level):**
+
   ```sql
   SELECT c.cv_id, c.anon_ref, c.current_title,
          1 - (ce.embedding <=> :query_vec::vector) AS semantic_score
@@ -104,6 +107,7 @@ Dieses Dokument bietet eine vollständige, strukturierte und technisch präzise 
   ORDER BY ce.embedding <=> :query_vec::vector
   LIMIT :top_n;
   ```
+
 * **Warum reines Vektor-Retrieval nicht ausreicht:**
   In frühen Tests zeigte sich: Ein "Lead Digital Designer" und ein "Digital Delivery Manager" hatten wegen Wörtern wie *"digital"*, *"teams"*, *"delivering"* eine Kosinus-Ähnlichkeit von > 0.82, obwohl die Profile beruflich inkompatibel sind. Daher wurde der **3-Stufen AI-Agenten-Trichter** entwickelt.
 
@@ -114,12 +118,14 @@ Dieses Dokument bietet eine vollständige, strukturierte und technisch präzise 
 Statt alle Kandidaten blind durch teure LLM-Prompts zu schleusen, arbeitet das System als hierarchischer Trichter:
 
 ### Stage 1: Profession Gate (Kompakt & Streng)
+
 * **Ziel:** Schließt berufsfremde Bewerber sofort aus (z. B. Grafikdesigner auf CFO-Stelle).
 * **Eingabe:** Job-Titel, Branche, Kernanforderungen vs. aktueller Titel des Kandidaten, Erfahrung, Summary.
 * **Output:** `relevant` (Boolean), `score` (0–10), `reason` (1 Satz Begründung).
 * **Filter:** Nur Kandidaten mit `relevant = True` dürfen in Stage 2.
 
 ### Stage 2: Requirements Scoring (Evidenzbasiert)
+
 * **Ziel:** Prüft jedes einzelne "Essential Requirement" der JD gegen das CV.
 * **Output pro Kriterium:** Score (0–10) + konkreter Evidenz-Auszug aus dem CV (kein Erfinden!).
 * **Aggregierter Output:**
@@ -128,6 +134,7 @@ Statt alle Kandidaten blind durch teure LLM-Prompts zu schleusen, arbeitet das S
   * `critical_gaps`: Liste fehlender Kernqualifikationen
 
 ### Stage 3: Deep AI Analysis (Nur Top 3–5 Kandidaten)
+
 * **Ziel:** Tiefenbericht für den Hiring Manager.
 * **Output:**
   * `strengths`: 2–3 belegte Kernstärken
@@ -135,7 +142,8 @@ Statt alle Kandidaten blind durch teure LLM-Prompts zu schleusen, arbeitet das S
   * `verdict`: Genau eines von `["Strong Match", "Possible Match", "Weak Match"]`
   * `recommendation`: 1–2 Sätze Handlungsempfehlung
 
-### Hard Filters (Regelbasiert):
+### Hard Filters (Regelbasiert)
+
 * `right_to_work_uk`: Zwingendes Ausschlusskriterium (wenn gefordert).
 * `min_years_experience`: Mindesterfahrung (wenn gefordert).
 
@@ -143,12 +151,13 @@ Statt alle Kandidaten blind durch teure LLM-Prompts zu schleusen, arbeitet das S
 
 ## 6. Scoring-Formel & Ranking-Berechnung
 
-### Berechnung des `final_score` (Skala 0–10):
+### Berechnung des `final_score` (Skala 0–10)
 
 Wenn Stage 3 ausgeführt wurde (Top-Kandidaten):
 $$\text{final\_score} = 0.30 \times \text{Stage 1 Score} + 0.55 \times \text{Stage 2 Score} + 0.15 \times \text{Stage 3 Wert}$$
 
 *Mapping für Stage 3 Verdict:*
+
 * `"Strong Match"` $\rightarrow 10.0$
 * `"Possible Match"` $\rightarrow 6.0$
 * `"Weak Match"` $\rightarrow 2.0$
@@ -158,7 +167,8 @@ $$\text{final\_score} = 0.35 \times \text{Stage 1 Score} + 0.65 \times \text{Sta
 
 *Begründung der Gewichtung:* Stage 2 (55%) trägt das größte Gewicht, weil das Erfüllen der konkreten Muss-Kriterien die Kernvoraussetzung ist.
 
-### Sortierung für `final_rank`:
+### Sortierung für `final_rank`
+
 1. Kandidaten mit `stage1_passed = True` stehen **immer** vor Kandidaten mit `stage1_passed = False`.
 2. Innerhalb beider Gruppen wird strikt nach `final_score` absteigend sortiert.
 
@@ -167,6 +177,7 @@ $$\text{final\_score} = 0.35 \times \text{Stage 1 Score} + 0.65 \times \text{Sta
 ## 7. Verwendete Prompts (LLM as Judge)
 
 ### Stage 1: Profession Gate Prompt
+
 ```text
 SYSTEM:
 You are an experienced UK recruiter with 15 years of expertise.
@@ -207,6 +218,7 @@ Format:
 ```
 
 ### Stage 2: Requirements Scoring Prompt
+
 ```text
 SYSTEM:
 You are an experienced UK recruiter.

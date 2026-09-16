@@ -1,6 +1,6 @@
 # Project Status & Handover Documentation
 
-**Last Updated:** 2026-09-15  
+**Last Updated:** 2026-09-16  
 **Repository:** [Davudinho/AI-matching](https://github.com/Davudinho/AI-matching)  
 **Current Branch:** `main`
 
@@ -9,47 +9,53 @@
 ## 📌 Executive Summary
 
 The project is an AI-powered, diversity-promoting candidate matching system (**Dyversifying / AI-matching**). It evaluates candidate CVs against Job Descriptions (JDs) using a 3-stage matching pipeline:
-1. **Stage 1 (Pre-filter / Hard Gate):** Hard criteria and field of work verification.
-2. **Stage 2 (Semantic Matching):** Vector embedding similarity (`text-embedding-004`).
-3. **Stage 3 (Deep AI Evaluation):** Gemini LLM assessment producing Match Scores, Critical Gaps, Strengths, and Recommendation.
+1. **Stage 1 (Profession Gate):** Fast binary verification of whether candidate career domain fits the role.
+2. **Stage 2 (Requirements Scoring):** Evidence-based evaluation of each essential requirement (0–10).
+3. **Stage 3 (Deep Match Report):** Comprehensive qualitative analysis for top shortlist candidates.
+4. **ML Calibration Layer:** Post-funnel statistical calibration model generating role-specific `is_top_match` decisions and calibrated `ml_confidence` scores based on recruiter feedback.
 
 ---
 
-## ✅ Recently Completed Work (as of 11.09.2026 – 15.09.2026)
+## ✅ Recently Completed Work (as of 16.09.2026)
 
-1. **Universal Document Parser (`backend/app/services/document_parser.py`):**
-   - Implemented unified parsing for `.pdf`, `.docx`, `.doc`, and `.txt`.
-   - **Hybrid PDF Extraction:** Native text extraction via PyMuPDF first; if extracted text < 100 characters, falls back automatically to **Gemini Vision OCR** (rendering pages to images and extracting text without needing external Tesseract binary).
-   - **Word 97-2003 (.doc) Support:** Windows COM automation via `pywin32` converts `.doc` to `.docx` dynamically.
-   - Added `pywin32` dependency to `requirements.txt`.
+### 1. ML Calibration & Evaluation Framework (5/5 Tasks Complete)
+- **Role-Specific Thresholds (`scripts/match_config.py` & `scripts/config/match_thresholds.json`):**
+  - Replaced rigid static cutoffs with empirically optimized thresholds per role (e.g., Delivery Manager: 1.5, Senior Finance Officer: 6.75, Head of Risk: 6.0, default: 6.0).
+- **Feature Logging & Database Expansion (`db/schema.sql`, `scripts/13_import_recruiter_labels.py`):**
+  - Added `recruiter_label` (0=Reject, 1=Possible, 2=Top Match), `is_top_match` (boolean), `ml_predicted_label` (int), and `ml_confidence` (float) to `ai_match_results`.
+  - Created idempotent migration and import script syncing evaluation data into PostgreSQL for all 176 match pairs.
+- **ML Calibration Model (`scripts/14_train_calibration_model.py`):**
+  - Supervised model trained on 9 match features with balanced sample weighting.
+  - Validated via **Leave-One-Role-Out Cross-Validation (8 folds)**: **94.89% Accuracy**, Weighted F1: **0.9513**, Top Match F1: **0.7273**.
+  - Production model serialized to `scripts/models/calibration_model.joblib`.
+  - Detailed report generated: [docs/ml_model_report.md](file:///c:/Users/User/projects/dyversifying/docs/ml_model_report.md).
+- **Offline Evaluation Module (`scripts/12_evaluate_model.py`):**
+  - Standalone script computing confusion matrices, Precision/Recall/F1, and generating [docs/evaluation_report.md](file:///c:/Users/User/projects/dyversifying/docs/evaluation_report.md).
+- **Online Matching & API Integration (`scripts/08_ai_match.py`, `scripts/11_export_results_en.py`, `matching.py`):**
+  - `08_ai_match.py` automatically performs threshold lookup and ML inference after the funnel.
+  - `11_export_results_en.py` exports `Top Match?` and `ML Confidence` with frozen panes and green highlights to [docs/evaluation_results_EN.xlsx](file:///c:/Users/User/projects/dyversifying/docs/evaluation_results_EN.xlsx).
+  - FastAPI endpoint `/api/v1/matching/{jd_id}/ai-results` exposes full funnel + ML confidence data.
+  - FastAPI endpoint `POST /api/v1/matching/feedback` records implicit recruiter feedback (`shortlist` -> 1, `interview` -> 2, `dismiss` -> 0).
 
-2. **Parser Script Integration:**
-   - [scripts/01_parse_jds.py](file:///c:/Users/User/projects/dyversifying/scripts/01_parse_jds.py): Multi-format support for Job Descriptions.
-   - [scripts/02_parse_cvs.py](file:///c:/Users/User/projects/dyversifying/scripts/02_parse_cvs.py): Supports `.pdf`, `.docx`, `.doc`, and `.txt`.
-   - Processed two new `.doc` candidate CVs (`Ranil Perera` -> **CAND-021**, `Jaisal Patel` -> **CAND-022**).
+### 2. Universal Document Parser & OCR Fallback
+- Unified parsing for `.pdf`, `.docx`, `.doc`, and `.txt`.
+- Native text extraction with automatic fallback to **Gemini Vision OCR** for scanned PDFs.
+- Added COM automation for legacy Word 97-2003 (`.doc`).
 
-3. **Complete English Localization:**
-   - [scripts/08_ai_match.py](file:///c:/Users/User/projects/dyversifying/scripts/08_ai_match.py): Entirely migrated to English (prompts, output schema, logs, reasoning).
-   - Executed 3-stage matching pipeline for all **176 candidate-job pairs** (22 candidates × 8 JDs).
-   - Both CAND-021 and CAND-022 were properly filtered by the profession hard gate (unrelated fields).
-
-4. **English Evaluation Export ([scripts/11_export_results_en.py](file:///c:/Users/User/projects/dyversifying/scripts/11_export_results_en.py)):**
-   - Automated script translating residual legacy German database entries into English.
-   - Generated final Excel file:  
-     📄 [docs/evaluation_results_EN.xlsx](file:///c:/Users/User/projects/dyversifying/docs/evaluation_results_EN.xlsx) (8 tabs for 8 JDs, 176 pairs, 100% in English).
+### 3. Documentation & Code Health
+- Resolved all Markdown linter warnings across documentation files.
+- Documented Implicit Feedback architecture: External platform recruiters do not need explicit rating forms; platform actions naturally train the system in the background.
 
 ---
 
 ## 📋 Open Tasks & Next Steps
 
-1. **Run OCR for the 32 Scanned Image-PDFs:**
-   - 32 CVs in the raw dataset (e.g., CAND-002, CAND-005, CAND-009, CAND-012) originally yielded 0 characters because they were scanned images before OCR was integrated.
-   - *Action needed:* Clear empty cache entries in `data/processed/cvs_raw.json` and re-run `scripts/02_parse_cvs.py` to populate them via Gemini Vision OCR, then cascade through anonymisation and matching.
-2. **Recruiter Decision Ground Truth:**
-   - Open [docs/evaluation_results_EN.xlsx](file:///c:/Users/User/projects/dyversifying/docs/evaluation_results_EN.xlsx) and review candidate pairings.
-   - Fill in the `Recruiter Decision` column (`0 = No`, `1 = Possible`, `2 = Good`).
-3. **Review Remaining Scripts for Language Consistency:**
-   - Ensure [scripts/06_match_evaluate.py](file:///c:/Users/User/projects/dyversifying/scripts/06_match_evaluate.py) and any evaluation helpers match the English formatting standard.
+1. **OCR for Scanned Image-PDFs:**
+   - Run OCR processing for candidate CVs that originally yielded 0 characters.
+2. **Collect Live Recruiter Interactions:**
+   - As recruiters use the frontend to shortlist or invite candidates, capture feedback via `/api/v1/matching/feedback` to continuously replace the initial AI-bootstrap labels with real human hiring decisions.
+3. **Periodic Model Retraining:**
+   - Run `python scripts/14_train_calibration_model.py` periodically when new recruiter decisions are logged.
 
 ---
 
@@ -57,12 +63,16 @@ The project is an AI-powered, diversity-promoting candidate matching system (**D
 
 | Path | Description |
 |---|---|
-| `backend/app/services/document_parser.py` | Central multi-format parser (.pdf with OCR fallback, .docx, .doc, .txt) |
-| `scripts/01_parse_jds.py` | Job description ingestion |
-| `scripts/02_parse_cvs.py` | CV ingestion & text extraction |
-| `scripts/03_anonymise_cvs.py` | PII removal & candidate anonymisation |
-| `scripts/04_build_dataset.py` | Dataset assembly & pairing |
-| `scripts/05_embed_and_store.py` | Vector embedding generation & Chroma/DB storage |
-| `scripts/08_ai_match.py` | 3-stage matching pipeline (English) |
-| `scripts/11_export_results_en.py` | Export pipeline to [docs/evaluation_results_EN.xlsx](file:///c:/Users/User/projects/dyversifying/docs/evaluation_results_EN.xlsx) |
-| `docs/evaluation_results_EN.xlsx` | Latest English evaluation results (176 pairs) |
+| `backend/app/services/document_parser.py` | Multi-format parser (.pdf with OCR fallback, .docx, .doc, .txt) |
+| `backend/app/api/routes/matching.py` | API endpoints: vector search, AI match results, and implicit feedback |
+| `scripts/match_config.py` | Central threshold loader and ML calibration inference helper |
+| `scripts/config/match_thresholds.json` | Empirically derived role-specific top match thresholds |
+| `scripts/models/calibration_model.joblib` | Serialized ML calibration model artifact |
+| `scripts/08_ai_match.py` | 3-stage matching pipeline with online ML scoring |
+| `scripts/11_export_results_en.py` | Excel export to `docs/evaluation_results_EN.xlsx` |
+| `scripts/12_evaluate_model.py` | Standalone offline evaluation & threshold generator |
+| `scripts/13_import_recruiter_labels.py` | DB schema expansion & recruiter label importer |
+| `scripts/14_train_calibration_model.py` | ML calibration model training with Leave-One-Role-Out CV |
+| `docs/evaluation_results_EN.xlsx` | Latest English evaluation results (176 pairs, with ML confidence) |
+| `docs/ml_model_report.md` | ML Cross-Validation & feature importance report |
+| `docs/evaluation_report.md` | Confusion matrices & role-level evaluation report |

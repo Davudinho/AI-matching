@@ -124,3 +124,84 @@ async def get_top_candidates(
         "top_n": top_n,
         "candidates": results,
     }
+
+
+@router.get("/{jd_id}/ai-results")
+async def get_ai_match_results(
+    jd_id: str,
+    top_n: int = Query(default=20, ge=1, le=100, description="Max candidates to return"),
+    top_match_only: bool = Query(default=False, description="Filter to top matches only"),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Retrieve 3-stage AI funnel matching results with ML calibration confidence and top match flags.
+    """
+    query_str = """
+        SELECT
+            r.id AS match_id,
+            r.final_rank,
+            r.final_score,
+            r.is_top_match,
+            r.ml_confidence,
+            r.ml_predicted_label,
+            r.recruiter_label,
+            r.stage1_passed,
+            r.stage1_score,
+            r.stage1_reason,
+            r.stage2_score,
+            r.stage2_met_count,
+            r.stage2_total_count,
+            r.stage2_breakdown,
+            r.stage2_critical_gaps,
+            r.stage3_verdict,
+            r.stage3_explanation,
+            c.cv_id,
+            c.anon_ref,
+            c.current_title,
+            c.years_experience,
+            c.right_to_work_uk
+        FROM ai_match_results r
+        JOIN candidates c ON r.cv_id = c.cv_id
+        WHERE r.jd_id = :jd_id
+    """
+    if top_match_only:
+        query_str += " AND r.is_top_match = TRUE"
+    query_str += " ORDER BY r.final_rank ASC NULLS LAST LIMIT :top_n"
+
+    res = await db.execute(text(query_str), {"jd_id": jd_id, "top_n": top_n})
+    rows = [dict(r) for r in res.mappings().all()]
+
+    return {
+        "jd_id": jd_id,
+        "count": len(rows),
+        "results": rows,
+    }
+
+
+@router.post("/feedback")
+async def record_recruiter_feedback(
+    match_id: int,
+    action: str = Query(..., pattern="^(shortlist|interview|dismiss)$", description="Implicit recruiter action"),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Record implicit feedback from natural recruiter actions without adding labeling workload:
+      - 'shortlist' -> recruiter_label = 1
+      - 'interview' -> recruiter_label = 2
+      - 'dismiss'   -> recruiter_label = 0
+    """
+    action_map = {"dismiss": 0, "shortlist": 1, "interview": 2}
+    label = action_map[action]
+
+    await db.execute(
+        text("UPDATE ai_match_results SET recruiter_label = :label WHERE id = :id"),
+        {"label": label, "id": match_id}
+    )
+    await db.commit()
+    return {
+        "status": "success",
+        "match_id": match_id,
+        "action": action,
+        "assigned_label": label
+    }
+

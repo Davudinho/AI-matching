@@ -80,6 +80,10 @@ def load_thresholds() -> dict:
     return data
 
 
+# Convenience alias
+get_all_thresholds = load_thresholds
+
+
 def get_top_match_threshold(jd_title: str, thresholds: dict = None) -> float:
     """
     Get the top-match threshold for a specific role.
@@ -141,11 +145,16 @@ def load_calibration_model():
 def predict_ml_confidence(
     model,
     feature_names: list,
-    stage1_score: float,
-    stage2_score: float,
+    stage1_score: float = 0.0,
+    stage1_passed: bool = False,
+    stage2_score: float = 0.0,
+    stage2_met_count: int = 0,
+    stage2_total_count: int = 0,
     stage3_verdict: str = None,
+    final_score: float = 0.0,
     years_experience: int = None,
     right_to_work_uk: bool = None,
+    **kwargs,
 ) -> dict:
     """
     Get ML-calibrated confidence scores for a candidate-JD pair.
@@ -154,8 +163,12 @@ def predict_ml_confidence(
         model: Trained sklearn model
         feature_names: List of feature names the model expects
         stage1_score: Score from Stage 1 (0-10)
+        stage1_passed: Boolean passed status for Stage 1
         stage2_score: Score from Stage 2 (0-10)
+        stage2_met_count: Count of requirements met in Stage 2
+        stage2_total_count: Total requirements evaluated
         stage3_verdict: Verdict string or None
+        final_score: Weighted final match score (0-10)
         years_experience: Candidate years of experience
         right_to_work_uk: Whether candidate has UK right to work
 
@@ -166,6 +179,15 @@ def predict_ml_confidence(
             ml_probabilities: dict {0: p0, 1: p1, 2: p2}
     """
     import numpy as np
+    import pandas as pd
+
+    def _clean_val(v, default=0.0):
+        if v is None or pd.isna(v):
+            return default
+        try:
+            return float(v)
+        except (ValueError, TypeError):
+            return default
 
     # Convert stage3 verdict to numeric
     s3_map = {"Strong Match": 10.0, "Possible Match": 6.0, "Weak Match": 2.0}
@@ -173,14 +195,21 @@ def predict_ml_confidence(
 
     # Build feature vector in the order the model expects
     feature_map = {
-        "stage1_score": float(stage1_score or 0),
-        "stage2_score": float(stage2_score or 0),
+        "stage1_score": _clean_val(stage1_score),
+        "stage1_passed": 1.0 if stage1_passed else 0.0,
+        "stage2_score": _clean_val(stage2_score),
+        "stage2_met_count": _clean_val(stage2_met_count),
+        "stage2_total_count": _clean_val(stage2_total_count),
+        "stage3_score": stage3_value,
         "stage3_value": stage3_value,
-        "years_experience": float(years_experience or 0),
+        "final_score": _clean_val(final_score),
+        "years_experience": _clean_val(years_experience),
         "right_to_work_uk": 1.0 if right_to_work_uk else 0.0,
     }
 
-    features = np.array([[feature_map.get(f, 0.0) for f in feature_names]])
+    # Ensure all required features are populated without NaNs
+    vec = [_clean_val(feature_map.get(f, 0.0)) for f in feature_names]
+    features = np.array([vec], dtype=float)
 
     try:
         predicted_label = int(model.predict(features)[0])
@@ -202,3 +231,4 @@ def predict_ml_confidence(
             "ml_confidence": None,
             "ml_probabilities": None,
         }
+
