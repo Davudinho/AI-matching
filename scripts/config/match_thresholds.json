@@ -1,0 +1,17 @@
+{
+  "default": 6.0,
+  "roles": {
+    "Delivery Manager (Online Products)": 1.5,
+    "Head of Risk and Internal Audit": 6.0,
+    "Senior Finance Officer": 6.75
+  },
+  "metadata": {
+    "generated_at": "2026-09-16T14:29:45.894110+00:00",
+    "source": "scripts/12_evaluate_model.py",
+    "labels_source": "AI-generated bootstrap (Perplexity) — replace with real recruiter data in production",
+    "global_f1": 0.9231,
+    "n_labelled_pairs": 176,
+    "n_top_matches": 6,
+    "n_possible_matches": 10
+  }
+}
