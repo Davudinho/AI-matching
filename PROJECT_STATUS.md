@@ -16,45 +16,49 @@ The project is an AI-powered, diversity-promoting candidate matching system (**D
 
 ---
 
-## ✅ Recently Completed Work (as of 16.09.2026)
+## ✅ Recently Completed Work (as of 22.09.2026)
 
-### 1. ML Calibration & Evaluation Framework (5/5 Tasks Complete)
-- **Role-Specific Thresholds (`scripts/match_config.py` & `scripts/config/match_thresholds.json`):**
-  - Replaced rigid static cutoffs with empirically optimized thresholds per role (e.g., Delivery Manager: 1.5, Senior Finance Officer: 6.75, Head of Risk: 6.0, default: 6.0).
-- **Feature Logging & Database Expansion (`db/schema.sql`, `scripts/13_import_recruiter_labels.py`):**
-  - Added `recruiter_label` (0=Reject, 1=Possible, 2=Top Match), `is_top_match` (boolean), `ml_predicted_label` (int), and `ml_confidence` (float) to `ai_match_results`.
-  - Created idempotent migration and import script syncing evaluation data into PostgreSQL for all 176 match pairs.
-- **ML Calibration Model (`scripts/14_train_calibration_model.py`):**
-  - Supervised model trained on 9 match features with balanced sample weighting.
-  - Validated via **Leave-One-Role-Out Cross-Validation (8 folds)**: **94.89% Accuracy**, Weighted F1: **0.9513**, Top Match F1: **0.7273**.
-  - Production model serialized to `scripts/models/calibration_model.joblib`.
-  - Detailed report generated: [docs/ml_model_report.md](file:///c:/Users/User/projects/dyversifying/docs/ml_model_report.md).
-- **Offline Evaluation Module (`scripts/12_evaluate_model.py`):**
-  - Standalone script computing confusion matrices, Precision/Recall/F1, and generating [docs/evaluation_report.md](file:///c:/Users/User/projects/dyversifying/docs/evaluation_report.md).
-- **Online Matching & API Integration (`scripts/08_ai_match.py`, `scripts/11_export_results_en.py`, `matching.py`):**
-  - `08_ai_match.py` automatically performs threshold lookup and ML inference after the funnel.
-  - `11_export_results_en.py` exports `Top Match?` and `ML Confidence` with frozen panes and green highlights to [docs/evaluation_results_EN.xlsx](file:///c:/Users/User/projects/dyversifying/docs/evaluation_results_EN.xlsx).
-  - FastAPI endpoint `/api/v1/matching/{jd_id}/ai-results` exposes full funnel + ML confidence data.
-  - FastAPI endpoint `POST /api/v1/matching/feedback` records implicit recruiter feedback (`shortlist` -> 1, `interview` -> 2, `dismiss` -> 0).
+### Phase 2: Frontend Implementation (Next.js 14+)
+- Scaffolding of a new Next.js 14 App Router project (`frontend/`).
+- Design system built with Tailwind CSS, `shadcn/ui`, and Framer Motion.
+- **Completed Pages:**
+  - Landing Page (`/`) with features and sector links.
+  - Job Browsing (`/jobs` and `/jobs/[id]`) with pagination and sector filtering.
+  - Candidate Application (`/apply/[id]`) with file dropzone and anonymisation privacy notice.
+  - Recruiter Auth (`/auth/login` and `/auth/register`).
+  - Recruiter Dashboard (`/dashboard`) with active jobs overview.
+  - JD Creation (`/dashboard/jobs/new`) with free-text and file upload (PDF/DOCX) modes. Both leverage Gemini for data extraction and embedding.
+  - Candidate Ranking (`/dashboard/jobs/[id]`) with ML scores, explainability, and quick feedback actions (Shortlist/Interview/Dismiss).
 
-### 2. Universal Document Parser & OCR Fallback
-- Unified parsing for `.pdf`, `.docx`, `.doc`, and `.txt`.
-- Native text extraction with automatic fallback to **Gemini Vision OCR** for scanned PDFs.
-- Added COM automation for legacy Word 97-2003 (`.doc`).
-
-### 3. Documentation & Code Health
-- Resolved all Markdown linter warnings across documentation files.
-- Documented Implicit Feedback architecture: External platform recruiters do not need explicit rating forms; platform actions naturally train the system in the background.
+### Phase 1: Backend API & Deployment Prep (FastAPI)
+- `auth.py`: JWT-based registration and login endpoints.
+- `candidates.py`: Refactored `/apply` to securely handle uploads, strip PII, and generate embeddings.
+- `jds.py`: Endpoints for JD text creation and file uploads.
+- `document_parser.py`: Linux-compatibility fix for `.doc` files (Render/Docker friendly).
+- Fully Dockerized API with a `render.yaml` blueprint.
+- Created `scripts/02b_reprocess_ocr_cvs.py` — targeted re-processing script for CVs with < 100 chars extracted.
+- Successfully processed 4 scanned image-PDFs via Gemini Vision OCR:
+  - `resume-dan-holt-1784553981.pdf` → Creative & Media
+  - `resume-rachel-young-1784454920.pdf` → Senior Photo Producer, Creative & Media
+  - `resume-tristan-mcshepherd-1784550112.pdf` → Filmmaker, Creative & Media
+  - `resume-fred-wang-1777976053.pdf` → Partner, Legal
+- Full downstream pipeline re-run: `03_anonymise_cvs.py` → `04_build_dataset.py` → `05_embed_and_store.py` → `08_ai_match.py` → `11_export_results_en.py`.
+- Embeddings regenerated using real OCR text (1400–1900 chars each, replacing previous empty vectors).
 
 ---
 
 ## 📋 Open Tasks & Next Steps
 
-1. **OCR for Scanned Image-PDFs:**
-   - Run OCR processing for candidate CVs that originally yielded 0 characters.
-2. **Collect Live Recruiter Interactions:**
+### Phase 3: Production Deployment
+The application is fully coded and ready for production deployment on free-tier platforms:
+1. **Supabase (Database):** Create project, run `db/schema.sql`, and configure `pgvector`.
+2. **Render (Backend API):** Deploy the Dockerized FastAPI service using the provided `render.yaml` blueprint.
+3. **Vercel (Frontend):** Deploy the Next.js app, configure CORS, and link `NEXT_PUBLIC_API_URL`.
+
+### Future Maintenance
+1. **Collect Live Recruiter Interactions:**
    - As recruiters use the frontend to shortlist or invite candidates, capture feedback via `/api/v1/matching/feedback` to continuously replace the initial AI-bootstrap labels with real human hiring decisions.
-3. **Periodic Model Retraining:**
+2. **Periodic Model Retraining:**
    - Run `python scripts/14_train_calibration_model.py` periodically when new recruiter decisions are logged.
 
 ---

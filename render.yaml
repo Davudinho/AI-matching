@@ -1,0 +1,64 @@
+# ============================================================
+# render.yaml — Render Blueprint
+#
+# This file lets Render automatically set up the backend service
+# when you connect your GitHub repository to Render.
+#
+# Usage:
+#   1. Push this file to GitHub
+#   2. Go to https://dashboard.render.com → New → Blueprint
+#   3. Connect your GitHub repo
+#   4. Render reads this file and creates the service automatically
+#
+# Docs: https://render.com/docs/blueprint-spec
+# ============================================================
+
+services:
+  - type: web
+    name: dyversifying-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .            # Build context = repo root (so backend/ and scripts/ are both available)
+    plan: free                  # Free tier: 512 MB RAM, sleeps after 15 min inactivity
+    region: frankfurt           # EU region (GDPR-friendly)
+    branch: main
+
+    # ---- Health check ----
+    healthCheckPath: /api/v1/health
+
+    # ---- Environment variables ----
+    # Set these in the Render dashboard under Environment → Add Environment Variable
+    # Do NOT put real secrets here — this file is committed to Git.
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+
+      - key: GEMINI_API_KEY
+        sync: false             # Must be set manually in Render dashboard
+
+      - key: DATABASE_URL
+        sync: false             # Supabase connection string — set in dashboard
+                                # Format: postgresql://user:pass@host:5432/dbname
+
+      - key: SECRET_KEY
+        sync: false             # Long random string for JWT signing — set in dashboard
+                                # Generate: python -c "import secrets; print(secrets.token_hex(32))"
+
+      - key: FRONTEND_URL
+        sync: false             # Your Vercel URL, e.g. https://dyversifying.vercel.app
+                                # Set after first Vercel deploy
+
+      - key: GEMINI_MODEL
+        value: gemini-2.0-flash
+
+      - key: GEMINI_EMBEDDING_MODEL
+        value: gemini-embedding-001
+
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "1440"           # 24 hours
+
+      - key: LOG_LEVEL
+        value: INFO
+
+      - key: PORT
+        value: "10000"          # Render's default internal port

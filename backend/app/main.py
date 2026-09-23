@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from backend.app.core.config import settings
-from backend.app.api.routes import jds, candidates, matching, health
+from backend.app.api.routes import jds, candidates, matching, health, auth
 
 # Create the FastAPI application
 app = FastAPI(
@@ -34,9 +34,16 @@ app = FastAPI(
 # CORS (Cross-Origin Resource Sharing) allows the frontend (running on
 # a different port) to call this API.
 # In production, replace "*" with the actual frontend domain.
+# In development: allow all origins.
+# In production: allow only the configured FRONTEND_URL (set in .env / Render env vars).
+_allowed_origins = (
+    ["*"]
+    if settings.ENVIRONMENT == "development"
+    else [o.strip() for o in settings.FRONTEND_URL.split(",") if o.strip()]
+)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"] if settings.ENVIRONMENT == "development" else ["https://yourdomain.com"],
+    allow_origins=_allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -46,6 +53,7 @@ app.add_middleware(
 # Each router handles a group of related endpoints.
 # The prefix becomes part of the URL: /api/v1/jds, /api/v1/candidates, etc.
 app.include_router(health.router, prefix="/api/v1", tags=["health"])
+app.include_router(auth.router, prefix="/api/v1/auth", tags=["Auth"])
 app.include_router(jds.router, prefix="/api/v1/jds", tags=["Job Descriptions"])
 app.include_router(candidates.router, prefix="/api/v1/candidates", tags=["Candidates"])
 app.include_router(matching.router, prefix="/api/v1/matching", tags=["Matching"])

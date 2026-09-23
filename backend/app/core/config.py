@@ -44,6 +44,9 @@ class Settings(BaseSettings):
     # ---- App ----
     ENVIRONMENT: str = "development"
     LOG_LEVEL: str = "INFO"
+    # Comma-separated list of allowed frontend origins for CORS in production.
+    # Example: "https://dyversifying.vercel.app,https://dyversifying.io"
+    FRONTEND_URL: str = "http://localhost:3000"
 
     # Tell Pydantic to read from a .env file in the project root
     model_config = SettingsConfigDict(

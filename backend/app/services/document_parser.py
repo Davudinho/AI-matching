@@ -112,12 +112,24 @@ def extract_text_from_doc(filepath: Path) -> str:
 
     Strategien (in Reihenfolge):
     1. win32com (Windows + MS Word installiert) — beste Qualität, konvertiert zu .docx
-    2. Fehlermeldung mit klarem Hinweis
+    2. Fehlermeldung mit klarem Hinweis (Linux/Render: .doc nicht unterstützt)
 
     Warum kein antiword/textract?
     Auf Windows ist win32com zuverlässiger und erfordert keine extra Systeminstallation
     (nur `pip install pywin32`), sofern MS Word installiert ist.
+    Auf Linux (z.B. Render) steht win32com nicht zur Verfügung — Nutzer werden gebeten,
+    die Datei als .docx oder .pdf einzureichen.
     """
+    import sys
+
+    # win32com ist nur auf Windows verfügbar (nicht auf Linux/Render)
+    if sys.platform != "win32":
+        raise ValueError(
+            f"Die Datei '{filepath.name}' ist im alten .doc-Format (Word 97–2003), "
+            "das auf diesem Server nicht unterstützt wird.\n"
+            "Bitte konvertieren Sie die Datei zu .docx oder .pdf und laden Sie sie erneut hoch."
+        )
+
     # Strategie: win32com (Windows + MS Word)
     try:
         import win32com.client
