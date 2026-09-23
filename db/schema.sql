@@ -123,10 +123,11 @@ CREATE TABLE IF NOT EXISTS jd_embeddings (
 );
 
 -- HNSW index: makes vector similarity search fast.
--- IVFFlat is limited to 2000 dimensions; HNSW supports up to 16,000.
--- gemini-embedding-001 produces 3072 dimensions, so HNSW is required.
-CREATE INDEX IF NOT EXISTS idx_jd_embedding_vector
-    ON jd_embeddings USING hnsw (embedding vector_cosine_ops);
+-- Note: standard pgvector limits HNSW to 2000 dimensions for standard vectors.
+-- Since gemini-embedding-001 produces 3072 dimensions, we rely on exact nearest neighbor
+-- search (no index) which is 100% accurate and perfectly fast for small-to-medium datasets.
+-- CREATE INDEX IF NOT EXISTS idx_jd_embedding_vector
+--     ON jd_embeddings USING hnsw (embedding vector_cosine_ops);
 
 
 -- ============================================================
@@ -141,8 +142,8 @@ CREATE TABLE IF NOT EXISTS cv_embeddings (
     PRIMARY KEY (cv_id, model)
 );
 
-CREATE INDEX IF NOT EXISTS idx_cv_embedding_vector
-    ON cv_embeddings USING hnsw (embedding vector_cosine_ops);
+-- CREATE INDEX IF NOT EXISTS idx_cv_embedding_vector
+--     ON cv_embeddings USING hnsw (embedding vector_cosine_ops);
 
 
 -- ============================================================
