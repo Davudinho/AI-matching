@@ -44,6 +44,7 @@ openpyxl>=3.1.0           # Read/write .xlsx Excel files (evaluation spreadsheet
 python-dotenv>=1.0.0      # Load .env files into environment variables
 pydantic>=2.10.0          # Data validation (FastAPI uses this internally)
 pydantic-settings>=2.7.0  # Load settings from .env into Pydantic models
+email-validator>=2.2.0    # Required by pydantic for EmailStr validation
 httpx>=0.28.0             # HTTP client (used in tests and API calls)
 tenacity>=9.0.0           # Retry logic with backoff (for flaky API calls)
 tqdm>=4.67.0              # Progress bars for long-running scripts
