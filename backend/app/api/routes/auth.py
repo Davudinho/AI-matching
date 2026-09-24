@@ -201,7 +201,7 @@ async def login(
             detail="Account is inactive. Contact support.",
         )
 
-    token = _create_access_token(user["user_id"], user["email"], user["role"])
+    token = _create_access_token(str(user["user_id"]), user["email"], user["role"])
     return TokenResponse(
         access_token=token,
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
