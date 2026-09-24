@@ -65,3 +65,11 @@ frontend/node_modules/
 frontend/.next/
 frontend/out/
 frontend/.env.local
+
+# ---- Local secret/token files (NEVER commit these) ----
+docker_token.txt
+qdrantKey.txt
+*.token.txt
+*.key.txt
+docker_token.txt
+qdrantKey.txt
