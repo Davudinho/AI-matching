@@ -38,7 +38,8 @@ async function apiFetch<T>(
   }
 
   // Don't set Content-Type for FormData (browser sets it with boundary)
-  if (!(options.body instanceof FormData)) {
+  // Don't override if explicitly provided (like application/x-www-form-urlencoded)
+  if (!(options.body instanceof FormData) && !headers["Content-Type"]) {
     headers["Content-Type"] = "application/json"
   }
 
@@ -51,7 +52,15 @@ async function apiFetch<T>(
 
   if (!res.ok) {
     const errorBody = await res.json().catch(() => ({ detail: res.statusText }))
-    throw new ApiError(res.status, errorBody.detail || "Request failed")
+    let errorMessage = "Request failed"
+    if (errorBody.detail) {
+      if (Array.isArray(errorBody.detail)) {
+        errorMessage = errorBody.detail.map((e: any) => e.msg || JSON.stringify(e)).join(", ")
+      } else {
+        errorMessage = errorBody.detail
+      }
+    }
+    throw new ApiError(res.status, errorMessage)
   }
 
   return res.json() as Promise<T>
