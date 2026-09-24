@@ -25,20 +25,25 @@ except ImportError:
 
 
 # ---- SQLAlchemy Async Engine ----
-# We convert the standard postgres:// URL to postgresql+asyncpg://
-# because asyncpg is the async driver we want to use.
-_db_url = settings.DATABASE_URL.replace(
-    "postgresql://", "postgresql+asyncpg://"
-).replace(
-    "postgres://", "postgresql+asyncpg://"
-)
+# asyncpg uses ssl=True in connect_args, NOT ?sslmode=require (that's psycopg2 syntax).
+# Strip any sslmode/ssl params from the URL to avoid conflicts.
+import re as _re
+_db_url = settings.DATABASE_URL
+_db_url = _db_url.replace("postgresql://", "postgresql+asyncpg://").replace("postgres://", "postgresql+asyncpg://")
+_db_url = _re.sub(r"[?&]sslmode=[^&]*", "", _db_url)  # strip psycopg2-style ssl param
+_db_url = _re.sub(r"[?&]ssl=[^&]*", "", _db_url)      # strip any other ssl param
+
+# Enable SSL for production (Supabase requires it)
+_is_production = settings.ENVIRONMENT == "production"
+_connect_args = {"ssl": True} if _is_production else {}
 
 async_engine = create_async_engine(
     _db_url,
     echo=(settings.ENVIRONMENT == "development"),  # Print SQL in dev mode
-    pool_size=10,        # Keep 10 connections ready in the pool
-    max_overflow=20,     # Allow up to 20 additional connections under heavy load
+    pool_size=5,         # Render free tier: keep pool small
+    max_overflow=10,
     pool_pre_ping=True,  # Test connections before using them (avoids stale conn errors)
+    connect_args=_connect_args,
 )
 
 # Session factory — creates new AsyncSession objects
