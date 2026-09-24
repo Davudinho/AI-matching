@@ -105,7 +105,7 @@ async def get_current_user(
         raise credentials_exc
 
     result = await db.execute(
-        text("SELECT user_id, email, full_name, role, is_active FROM users WHERE user_id = :uid"),
+        text("SELECT user_id, email, full_name, role, is_active, created_at FROM users WHERE user_id = :uid"),
         {"uid": user_id},
     )
     user = result.mappings().first()
