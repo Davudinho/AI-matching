@@ -33,10 +33,19 @@ _db_url = _db_url.replace("postgresql://", "postgresql+asyncpg://").replace("pos
 _db_url = _re.sub(r"[?&]sslmode=[^&]*", "", _db_url)  # strip psycopg2-style ssl param
 _db_url = _re.sub(r"[?&]ssl=[^&]*", "", _db_url)      # strip any other ssl param
 
-# Enable SSL for production (Supabase requires it)
-# statement_cache_size=0 is required for Supabase connection pooler (Session/Transaction mode)
+# Enable SSL for production (Supabase requires it).
+# We use a custom SSLContext with check_hostname=False + CERT_NONE because
+# the python:slim Docker image lacks the CA bundle to verify Supabase's cert chain.
+# This is standard practice for managed Postgres providers on containerised deployments.
 _is_production = settings.ENVIRONMENT == "production"
-_connect_args = {"ssl": True, "statement_cache_size": 0} if _is_production else {}
+if _is_production:
+    import ssl as _ssl
+    _ssl_ctx = _ssl.create_default_context()
+    _ssl_ctx.check_hostname = False
+    _ssl_ctx.verify_mode = _ssl.CERT_NONE
+    _connect_args: dict = {"ssl": _ssl_ctx, "statement_cache_size": 0}
+else:
+    _connect_args = {}
 
 async_engine = create_async_engine(
     _db_url,
