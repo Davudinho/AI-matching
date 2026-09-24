@@ -14,7 +14,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
-from passlib.context import CryptContext
+import bcrypt
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
@@ -25,7 +25,7 @@ from backend.app.core.config import settings
 router = APIRouter()
 
 # ---- Password hashing ----
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Using bcrypt directly because passlib is incompatible with bcrypt >= 4.1.0
 
 # ---- OAuth2 scheme (reads Bearer token from Authorization header) ----
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
@@ -57,11 +57,15 @@ class RecruiterProfile(BaseModel):
 # ---- Helpers ----
 
 def _hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
 
 
 def _verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    try:
+        return bcrypt.checkpw(plain.encode('utf-8'), hashed.encode('utf-8'))
+    except Exception:
+        return False
 
 
 def _create_access_token(user_id: str, email: str, role: str) -> str:
