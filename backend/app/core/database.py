@@ -34,15 +34,16 @@ _db_url = _re.sub(r"[?&]sslmode=[^&]*", "", _db_url)  # strip psycopg2-style ssl
 _db_url = _re.sub(r"[?&]ssl=[^&]*", "", _db_url)      # strip any other ssl param
 
 # Enable SSL for production (Supabase requires it)
+# statement_cache_size=0 is required for Supabase connection pooler (Session/Transaction mode)
 _is_production = settings.ENVIRONMENT == "production"
-_connect_args = {"ssl": True} if _is_production else {}
+_connect_args = {"ssl": True, "statement_cache_size": 0} if _is_production else {}
 
 async_engine = create_async_engine(
     _db_url,
     echo=(settings.ENVIRONMENT == "development"),  # Print SQL in dev mode
     pool_size=5,         # Render free tier: keep pool small
     max_overflow=10,
-    pool_pre_ping=True,  # Test connections before using them (avoids stale conn errors)
+    pool_pre_ping=True,  # Test connections before using them
     connect_args=_connect_args,
 )
 
