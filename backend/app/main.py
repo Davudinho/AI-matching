@@ -31,19 +31,19 @@ app = FastAPI(
 )
 
 # ---- CORS Middleware ----
-# CORS (Cross-Origin Resource Sharing) allows the frontend (running on
-# a different port) to call this API.
-# In production, replace "*" with the actual frontend domain.
 # In development: allow all origins.
-# In production: allow only the configured FRONTEND_URL (set in .env / Render env vars).
+# In production: allow the configured FRONTEND_URL + any *.vercel.app subdomain.
+# allow_origin_regex covers all Vercel preview and production deployments automatically.
 _allowed_origins = (
     ["*"]
     if settings.ENVIRONMENT == "development"
     else [o.strip() for o in settings.FRONTEND_URL.split(",") if o.strip()]
 )
+_origin_regex = None if settings.ENVIRONMENT == "development" else r"https://.*\.vercel\.app"
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_allowed_origins,
+    allow_origin_regex=_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
