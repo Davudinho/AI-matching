@@ -17,6 +17,18 @@ export default function DashboardPage() {
       .finally(() => setLoading(false))
   }, [])
 
+  const handleDelete = async (jdId: string, e: React.MouseEvent) => {
+    e.preventDefault() // prevent navigating to job details
+    if (!confirm("Are you sure you want to delete this job description? This cannot be undone.")) return
+    
+    try {
+      await api.jobs.delete(jdId)
+      setJobs((prev) => prev.filter((j) => j.jd_id !== jdId))
+    } catch (err) {
+      alert("Failed to delete job. Please try again.")
+    }
+  }
+
   return (
     <div>
       {/* Header */}
@@ -33,9 +45,6 @@ export default function DashboardPage() {
       <div style={{ display: "flex", gap: "0.75rem", marginBottom: "2.5rem", flexWrap: "wrap" }}>
         <Link href="/dashboard/jobs/new" className="btn btn-primary">
           + Create new JD
-        </Link>
-        <Link href="/dashboard/jobs" className="btn btn-secondary">
-          View all jobs
         </Link>
       </div>
 
@@ -69,9 +78,30 @@ export default function DashboardPage() {
               >
                 <article
                   className="card"
-                  style={{ cursor: "pointer", height: "100%" }}
+                  style={{ cursor: "pointer", height: "100%", position: "relative" }}
                 >
-                  <div style={{ display: "flex", gap: "0.4rem", marginBottom: "0.75rem", flexWrap: "wrap" }}>
+                  <button
+                    onClick={(e) => handleDelete(job.jd_id, e)}
+                    style={{
+                      position: "absolute",
+                      top: "1rem",
+                      right: "1rem",
+                      background: "hsla(0, 70%, 55%, 0.1)",
+                      color: "var(--danger)",
+                      border: "none",
+                      borderRadius: "var(--radius-sm)",
+                      padding: "0.4rem",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      transition: "all 0.2s"
+                    }}
+                    title="Delete Job Description"
+                  >
+                    🗑️
+                  </button>
+                  <div style={{ display: "flex", gap: "0.4rem", marginBottom: "0.75rem", flexWrap: "wrap", paddingRight: "2rem" }}>
                     {job.sector && <span className="badge badge-purple">{job.sector}</span>}
                     {job.contract_type && <span className="badge badge-teal">{job.contract_type}</span>}
                   </div>
