@@ -160,7 +160,7 @@ async def _parse_and_store_candidate(
         vec_str = "[" + ",".join(str(v) for v in embedding_vec) + "]"
         await db.execute(text("""
             INSERT INTO cv_embeddings (cv_id, model, embedding)
-            VALUES (:cv_id, :model, :embedding::vector)
+            VALUES (:cv_id, :model, CAST(:embedding AS vector))
             ON CONFLICT (cv_id, model) DO UPDATE SET embedding = EXCLUDED.embedding
         """), {
             "cv_id": cv_id,

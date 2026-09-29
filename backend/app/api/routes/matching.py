@@ -63,10 +63,10 @@ async def get_top_candidates(
             c.cv_id, c.anon_ref, c.current_title, c.years_experience,
             c.skills_technical, c.skills_soft, c.sector_experience,
             c.right_to_work_uk,
-            1 - (ce.embedding <=> :query_vec::vector) AS semantic_score
+            1 - (ce.embedding <=> CAST(:query_vec AS vector)) AS semantic_score
         FROM candidates c
         JOIN cv_embeddings ce ON c.cv_id = ce.cv_id
-        ORDER BY ce.embedding <=> :query_vec::vector  -- closest first
+        ORDER BY ce.embedding <=> CAST(:query_vec AS vector)  -- closest first
         LIMIT :top_n
     """), {"query_vec": embedding_str, "top_n": top_n})
 

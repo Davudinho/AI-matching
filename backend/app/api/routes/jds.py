@@ -117,7 +117,7 @@ async def _insert_jd(db: AsyncSession, fields: dict, raw_text: str, filename: st
         vec_str = "[" + ",".join(str(v) for v in embedding_vec) + "]"
         await db.execute(text("""
             INSERT INTO jd_embeddings (jd_id, model, embedding)
-            VALUES (:jd_id, :model, :embedding::vector)
+            VALUES (:jd_id, :model, CAST(:embedding AS vector))
             ON CONFLICT (jd_id, model) DO UPDATE SET embedding = EXCLUDED.embedding
         """), {
             "jd_id": jd_id,
