@@ -11,7 +11,10 @@ When running:
   uvicorn backend.app.main:app --reload --port 8000
 """
 
-from fastapi import FastAPI
+import logging
+import traceback
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -68,3 +71,17 @@ async def root():
         "docs": "/docs",
         "environment": settings.ENVIRONMENT,
     }
+
+
+# ---- Global error handler ----
+# Returns the actual error message instead of opaque "Internal Server Error"
+logger = logging.getLogger("dyversifying")
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    tb = traceback.format_exc()
+    logger.error(f"Unhandled error on {request.method} {request.url.path}: {exc}\n{tb}")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"{type(exc).__name__}: {str(exc)}"},
+    )
