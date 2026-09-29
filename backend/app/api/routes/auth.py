@@ -111,7 +111,15 @@ async def get_current_user(
     user = result.mappings().first()
     if not user or not user["is_active"]:
         raise credentials_exc
-    return dict(user)
+    # Convert asyncpg types (UUID, datetime) to JSON-safe Python types
+    return {
+        "user_id": str(user["user_id"]),
+        "email": user["email"],
+        "full_name": user["full_name"],
+        "role": user["role"],
+        "is_active": user["is_active"],
+        "created_at": user["created_at"],
+    }
 
 
 async def require_recruiter(current_user: dict = Depends(get_current_user)) -> dict:
