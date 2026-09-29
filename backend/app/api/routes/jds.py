@@ -81,10 +81,10 @@ async def _insert_jd(db: AsyncSession, fields: dict, raw_text: str, filename: st
         ) VALUES (
             :jd_id, :filename, :title, :organisation, :location,
             :salary_range, :contract_type, :seniority_level, :sector,
-            :responsibilities::jsonb, :essential_requirements::jsonb, :desirable_requirements::jsonb,
-            :skills_technical::jsonb, :skills_soft::jsonb, :qualifications::jsonb,
-            :profession_domain, '[]'::jsonb, :min_years_experience,
-            :raw_text, :embedding_text, :missing_fields::jsonb, :quality_flags::jsonb
+            CAST(:responsibilities AS JSONB), CAST(:essential_requirements AS JSONB), CAST(:desirable_requirements AS JSONB),
+            CAST(:skills_technical AS JSONB), CAST(:skills_soft AS JSONB), CAST(:qualifications AS JSONB),
+            :profession_domain, CAST('[]' AS JSONB), :min_years_experience,
+            :raw_text, :embedding_text, CAST(:missing_fields AS JSONB), CAST(:quality_flags AS JSONB)
         )
     """), {
         "jd_id": jd_id,
