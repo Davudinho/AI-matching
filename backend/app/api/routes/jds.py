@@ -148,6 +148,17 @@ async def list_jds(
     """
     limit = min(limit, 100)
     where = "WHERE sector = :sector" if sector else ""
+    params = {"limit": limit, "skip": skip}
+    if sector:
+        params["sector"] = sector
+
+    # Get total count for pagination
+    count_result = await db.execute(
+        text(f"SELECT COUNT(*) FROM job_descriptions {where}"),
+        {k: v for k, v in params.items() if k == "sector"},
+    )
+    total = count_result.scalar() or 0
+
     query = text(f"""
         SELECT jd_id, title, organisation, location, sector,
                seniority_level, contract_type, salary_range,
@@ -157,13 +168,10 @@ async def list_jds(
         ORDER BY created_at DESC
         LIMIT :limit OFFSET :skip
     """)
-    params = {"limit": limit, "skip": skip}
-    if sector:
-        params["sector"] = sector
 
     result = await db.execute(query, params)
     rows = result.mappings().all()
-    return {"total": len(rows), "skip": skip, "limit": limit, "items": [dict(r) for r in rows]}
+    return {"total": total, "skip": skip, "limit": limit, "items": [dict(r) for r in rows]}
 
 
 @router.get("/{jd_id}")

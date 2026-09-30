@@ -126,11 +126,11 @@ async def _parse_and_store_candidate(
         ) VALUES (
             :cv_id, :filename, :anon_ref,
             :current_title, :years_experience, :career_summary,
-            :skills_technical::jsonb, :skills_soft::jsonb,
-            :education::jsonb, :work_history::jsonb, :certifications::jsonb, :languages::jsonb,
-            :sector_experience::jsonb, :right_to_work_uk,
+            CAST(:skills_technical AS JSONB), CAST(:skills_soft AS JSONB),
+            CAST(:education AS JSONB), CAST(:work_history AS JSONB), CAST(:certifications AS JSONB), CAST(:languages AS JSONB),
+            CAST(:sector_experience AS JSONB), :right_to_work_uk,
             :profession_domain,
-            :raw_text_anon, :embedding_text, '[]'::jsonb
+            :raw_text_anon, :embedding_text, CAST('[]' AS JSONB)
         )
     """), {
         "cv_id": cv_id,
@@ -197,7 +197,7 @@ async def list_candidates(
     params = {"limit": limit, "skip": skip}
 
     if sector:
-        conditions.append("sector_experience @> :sector::jsonb")
+        conditions.append("sector_experience @> CAST(:sector AS JSONB)")
         params["sector"] = f'["{sector}"]'
     if min_years_exp is not None:
         conditions.append("years_experience >= :min_years_exp")

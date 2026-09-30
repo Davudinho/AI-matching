@@ -54,7 +54,7 @@ export default function JobCandidatesPage() {
           </p>
         </div>
         <div style={{ display: "flex", gap: "0.5rem" }}>
-          <a href="/dashboard/jobs" className="btn btn-secondary" style={{ fontSize: "0.8rem" }}>
+          <a href="/dashboard" className="btn btn-secondary" style={{ fontSize: "0.8rem" }}>
             ← All Jobs
           </a>
         </div>
