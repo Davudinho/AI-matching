@@ -19,7 +19,8 @@ bcrypt>=4.1.0
 
 # ---- Database ----
 asyncpg>=0.30.0           # Async PostgreSQL driver (fastest for Python async)
-sqlalchemy>=2.0.0         # ORM / query builder — gives us Python classes for DB tables
+sqlalchemy[asyncio]>=2.0.0 # ORM / query builder — [asyncio] pulls in greenlet for async support
+greenlet>=3.0.0           # Explicitly required by SQLAlchemy asyncio in Python 3.12
 psycopg2-binary>=2.9.9    # Sync PostgreSQL driver (used in scripts and migrations)
 alembic>=1.14.0           # Database migrations (like Git for your database schema)
 
