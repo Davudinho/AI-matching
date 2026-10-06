@@ -71,5 +71,11 @@ docker_token.txt
 qdrantKey.txt
 *.token.txt
 *.key.txt
+docs/*Passwort*
+docs/*passwort*
+docs/*password*
+docs/*API Key*
+docs/*api*key*
+*secret*.txt
 docker_token.txt
 qdrantKey.txt

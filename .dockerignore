@@ -1,0 +1,39 @@
+# ============================================================
+# .dockerignore — keeps the backend image small and free of
+# personal data / secrets. Build context = repo root (render.yaml).
+# The image only needs: backend/, scripts/ (match_config, models,
+# config), requirements.txt, db/.
+# ============================================================
+
+# VCS / tooling
+.git
+.github
+.vscode
+.idea
+**/__pycache__
+**/*.pyc
+
+# Environments & secrets (set via Render env vars instead)
+.env
+.env.*
+!.env.example
+venv/
+.venv/
+docker_token.txt
+qdrantKey.txt
+*.token.txt
+*.key.txt
+
+# Personal data (real CVs) and generated outputs
+data/
+
+# Docs, reports, spreadsheets (not needed at runtime; may contain secrets)
+docs/
+
+# Frontend is deployed separately on Vercel
+frontend/
+
+# Tests & logs
+tests/
+*.log
+logs/

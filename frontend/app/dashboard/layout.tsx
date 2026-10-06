@@ -52,7 +52,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         }}
       >
         <nav style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-          <SidebarLink href="/dashboard" icon="💼" label="My Jobs" />
+          <SidebarLink href="/dashboard" icon="📊" label="Overview" />
+          <SidebarLink href="/dashboard/jobs" icon="💼" label="All Jobs" />
           <SidebarLink href="/dashboard/jobs/new" icon="+" label="Create JD" isAccent />
         </nav>
       </aside>
