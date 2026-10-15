@@ -1,6 +1,6 @@
 # Project Status & Handover Documentation
 
-**Last Updated:** 2026-10-05
+**Last Updated:** 2026-10-13
 **Repository:** [Davudinho/AI-matching](https://github.com/Davudinho/AI-matching)
 **Current Branch:** `main`
 
@@ -23,6 +23,15 @@ The project is an AI-powered, diversity-promoting candidate matching system (**D
 ---
 
 ## 🗓️ Daily Log
+
+### 2026-10-13 — Status reconstruction (verified against git + code)
+- Only 2 commits since 02.10.: `4c9e85b` (dockerignore, gitignore, dashboard/jobs page, docs) and `f657041` (greenlet fix, see below).
+- **None of the P0 items is implemented yet** (verified by code search: no `recruiter_id`, no queue/worker, no rate limiting, no `candidate_contacts`; `require_recruiter` only guards JD upload/create/delete).
+- Not verified: whether Render redeployed successfully after `f657041`; whether Gemini key / DB password were rotated; whether `/dashboard/jobs` is live on Vercel.
+
+### 2026-10-06 — Render deploy crash fixed
+- Render build failed at startup: `ModuleNotFoundError: greenlet` (SQLAlchemy asyncio). Fix: `sqlalchemy[asyncio]` + explicit `greenlet` in `requirements.txt` (`f657041`).
+- Likely root cause (unverified): `requirements.txt` uses unpinned `>=` versions, so a fresh Docker build pulled a newer SQLAlchemy where greenlet is an optional extra. **Risk remains:** any fresh build can break again until dependencies are pinned.
 
 ### 2026-10-05 — Manual live test + code review
 **Works:** Recruiter registration, login, JD creation (text + PDF/DOCX upload).
