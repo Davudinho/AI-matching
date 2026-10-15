@@ -24,6 +24,12 @@ The project is an AI-powered, diversity-promoting candidate matching system (**D
 
 ## 🗓️ Daily Log
 
+### 2026-10-15 — Navigation fix & /dashboard/jobs redirect
+- Fixed broken / 404 link when clicking "View all jobs" / "All Jobs" in recruiter dashboard.
+- Updated dashboard sidebar (`frontend/app/dashboard/layout.tsx`), dashboard quick actions (`frontend/app/dashboard/page.tsx`), and candidate ranking header (`frontend/app/dashboard/jobs/[id]/page.tsx`) to link to `/jobs`.
+- Configured route redirect from `/dashboard/jobs` to `/jobs` in `frontend/next.config.ts` and `frontend/app/dashboard/jobs/page.tsx` to prevent any future 404 errors.
+- Verified frontend production build (`npm run build`) succeeded without errors.
+
 ### 2026-10-13 — Status reconstruction (verified against git + code)
 - Only 2 commits since 02.10.: `4c9e85b` (dockerignore, gitignore, dashboard/jobs page, docs) and `f657041` (greenlet fix, see below).
 - **None of the P0 items is implemented yet** (verified by code search: no `recruiter_id`, no queue/worker, no rate limiting, no `candidate_contacts`; `require_recruiter` only guards JD upload/create/delete).

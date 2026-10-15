@@ -46,6 +46,9 @@ export default function DashboardPage() {
         <Link href="/dashboard/jobs/new" className="btn btn-primary">
           + Create new JD
         </Link>
+        <Link href="/jobs" className="btn btn-secondary">
+          View all jobs
+        </Link>
       </div>
 
       {/* Active jobs */}
