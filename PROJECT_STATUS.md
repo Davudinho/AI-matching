@@ -1,6 +1,6 @@
 # Project Status & Handover Documentation
 
-**Last Updated:** 2026-10-13
+**Last Updated:** 2026-10-15
 **Repository:** [Davudinho/AI-matching](https://github.com/Davudinho/AI-matching)
 **Current Branch:** `main`
 
@@ -24,11 +24,16 @@ The project is an AI-powered, diversity-promoting candidate matching system (**D
 
 ## 🗓️ Daily Log
 
-### 2026-10-15 — Navigation fix & /dashboard/jobs redirect
-- Fixed broken / 404 link when clicking "View all jobs" / "All Jobs" in recruiter dashboard.
-- Updated dashboard sidebar (`frontend/app/dashboard/layout.tsx`), dashboard quick actions (`frontend/app/dashboard/page.tsx`), and candidate ranking header (`frontend/app/dashboard/jobs/[id]/page.tsx`) to link to `/jobs`.
-- Configured route redirect from `/dashboard/jobs` to `/jobs` in `frontend/next.config.ts` and `frontend/app/dashboard/jobs/page.tsx` to prevent any future 404 errors.
-- Verified frontend production build (`npm run build`) succeeded without errors.
+### 2026-10-15 — Navigation Fix, /dashboard/jobs Redirect & Deployment Verification
+- **Render Deployment Check:** Clarified that Render auto-deploys trigger upon `git push` to `origin/main` rather than local `git commit`. Pushed pending local commits (`528a750`, `4f7264e`) to GitHub.
+- **Frontend 404 Resolution ("View all jobs" / "All Jobs"):**
+  - Resolved 404 error occurring on the recruiter dashboard when navigating to `/dashboard/jobs`.
+  - Re-added the "View all jobs" button in [`frontend/app/dashboard/page.tsx`](file:///c:/Users/User/projects/dyversifying/frontend/app/dashboard/page.tsx) pointing to `/jobs`.
+  - Updated the sidebar link in [`frontend/app/dashboard/layout.tsx`](file:///c:/Users/User/projects/dyversifying/frontend/app/dashboard/layout.tsx) from `/dashboard/jobs` to `/jobs`.
+  - Updated the back-link in [`frontend/app/dashboard/jobs/[id]/page.tsx`](file:///c:/Users/User/projects/dyversifying/frontend/app/dashboard/jobs/%5Bid%5D/page.tsx) from `/dashboard` to `/jobs`.
+  - Added seamless permanent redirect rules in [`frontend/next.config.ts`](file:///c:/Users/User/projects/dyversifying/frontend/next.config.ts) and [`frontend/app/dashboard/jobs/page.tsx`](file:///c:/Users/User/projects/dyversifying/frontend/app/dashboard/jobs/page.tsx) redirecting `/dashboard/jobs` → `/jobs`.
+- **Validation:** Successfully compiled frontend production bundle with `npm run build` (Turbopack + TypeScript passed without issues).
+- **Git Push:** Committed changes under `4f7264e` and pushed directly to `origin/main` for automated Vercel deployment.
 
 ### 2026-10-13 — Status reconstruction (verified against git + code)
 - Only 2 commits since 02.10.: `4c9e85b` (dockerignore, gitignore, dashboard/jobs page, docs) and `f657041` (greenlet fix, see below).
@@ -126,13 +131,17 @@ All three platforms are deployed. **22 bugfix commits** were required to get the
 | 2026-09-29 | `5ca763b` | Removed broken `/dashboard/jobs` sidebar link |
 | 2026-09-29 | `ec285f7` | Added delete button to JD cards; removed broken `/dashboard/jobs` link |
 | 2026-09-30 | `9adcf8f` | Patched remaining `::jsonb` casts in `candidates.py`; fixed pagination count; fixed broken `/dashboard/jobs` link in rankings page |
+| 2026-10-06 | `4c9e85b` | Added dockerignore, frontend dashboard pages, and project documentation |
+| 2026-10-06 | `f657041` | Added `sqlalchemy[asyncio]` and `greenlet` to requirements.txt to fix Render deployment |
+| 2026-10-15 | `528a750` | Updated project status and daily log with recent commits and findings |
+| 2026-10-15 | `4f7264e` | Added recruiter dashboard views and configured job route redirects to fix 404 |
 
 ---
 
 ## 📋 Open Tasks & Next Steps
 
 ### P0 — Blockers (before any real user)
-1. Remove secret files from `docs/`, extend `.gitignore`, add `.dockerignore`, rotate keys.
+1. Remove secret files from `docs/`, extend `.gitignore`, add `.dockerignore`, rotate keys. *(Partial: `.gitignore` and `.dockerignore` committed)*
 2. Multi-tenancy: `recruiter_id` on JDs + ownership checks.
 3. Auth on all recruiter endpoints (`ai-results`, `feedback`, `candidates`).
 4. Async application processing + run 3-stage matching live.
@@ -141,7 +150,7 @@ All three platforms are deployed. **22 bugfix commits** were required to get the
 ### P1 — Core UX (pending product decisions)
 6. Candidate identity model: email, dedupe, reveal-on-shortlist, LLM name anonymisation.
 7. Pipeline view (New / Shortlist / Interview / Dismissed).
-8. `/dashboard/jobs` page with delete + visibility settings.
+8. Dedicated job management table (delete already present on `/dashboard`; `/dashboard/jobs` redirects to `/jobs`).
 9. Role-aware navigation; block `/apply` for recruiters.
 10. `.doc` support via `antiword` (CV + JD).
 
@@ -187,7 +196,7 @@ All three platforms are deployed. **22 bugfix commits** were required to get the
 |---|---|---|
 | **Supabase** | PostgreSQL + pgvector (3072-dim) | ✅ Running |
 | **Render** | FastAPI (Docker, Frankfurt, free tier) | 🟡 Running, unstable (OOM/timeouts on large CVs) |
-| **Vercel** | Next.js 14 frontend | 🟡 Running, deployed state lags local code |
+| **Vercel** | Next.js 16 frontend | ✅ Running, auto-deployed from `main` (`4f7264e`) |
 
 **Key env vars (set in Render dashboard):**
 - `GEMINI_API_KEY`, `DATABASE_URL`, `SECRET_KEY`, `FRONTEND_URL`
